@@ -38,43 +38,44 @@ defmodule KeyPair do
     SeedGenerator.generate(mnemonic, pass_phrase, opts)
   end
 
-  def generate_master_key(:seed, seed) do
-    generate_master_key(:public, :crypto.hmac(:sha512, @bitcoin_const, seed))
+  def generate_master_key(seed, :seed) do
+    generate_master_key(:crypto.hmac(:sha512, @bitcoin_const, seed), :private)
   end
 
-  def generate_master_key(:private, <<priv_key::binary-32, chain_code::binary>>) do
+  def generate_master_key(<<priv_key::binary-32, chain_code::binary>>, :private) do
     key = Bip32PrivKey.create(:mainnet)
     key = %{key | key: priv_key, chain_code: chain_code}
 
-    #KeyPair.derive(pub_key, "m/0")
-    #KeyPair.format_key(key)
+    #KeyPair.derive(key, "m/0'/1/2'") |> KeyPair.generate_master_key(:public)
+    #KeyPair.format_key(KeyPair.derive(key, "m/0'/1/2'"))
   end
-  def generate_master_key(:public, seed) do
-    priv_key = KeyPair.generate_master_key(:private, seed)
+  def generate_master_key(%Bip32PrivKey{} = priv_key, :public) do
     pub_key = KeyPair.generate_pub_key(priv_key)
     key = Bip32PubKey.create(:mainnet)
-    key = %{key | key: pub_key, chain_code: priv_key.chain_code}
-
-    #IO.inspect key
-    KeyPair.derive(key, "m/0")
+    #IO.inspect "Private key chain"
+    #IO.inspect priv_key.chain_code
+    key = %{key |
+            depth: priv_key.depth,
+            f_print: priv_key.f_print,
+            child_num: priv_key.child_num,
+            chain_code: priv_key.chain_code,
+            key: pub_key}
     #KeyPair.format_key(key)
   end
 
   def generate_pub_key(%Bip32PrivKey{key: priv_key} = key) do
-    {pub_key, _priv_key} = :crypto.generate_key(:ecdh, :secp256k1, priv_key)
+    {pub_key, _rest} = :crypto.generate_key(:ecdh, :secp256k1, priv_key)
     pub_key
   end
   def generate_pub_key(%Bip32PrivKey{key: priv_key} = key, :compressed) do
-    KeyPair.generate_pub_key(key)
-    |> KeyPair.compress()
-    |> Base.decode16!()
+    key |> KeyPair.generate_pub_key() |> KeyPair.compress()
   end
 
   def fingerprint(%Bip32PrivKey{key: priv_key} = key) do
     KeyPair.fingerprint(KeyPair.generate_pub_key(key, :compressed))
   end
   def fingerprint(%Bip32PubKey{key: pub_key} = key) do
-    KeyPair.fingerprint(pub_key |> KeyPair.compress() |> Base.decode16!())
+    KeyPair.fingerprint(KeyPair.compress(pub_key))
   end
   def fingerprint(pub_key) do
     <<f_print::binary-4, _rest::binary>> =
@@ -83,10 +84,7 @@ defmodule KeyPair do
   end
 
   defp serialize(%Bip32PubKey{key: pub_key} = key) do
-    compressed_pub_key =
-      pub_key
-      |> KeyPair.compress()
-      |> Base.decode16!()
+    compressed_pub_key = KeyPair.compress(pub_key)
     {<<key.version::size(32)>>, <<key.depth::size(8), key.f_print::binary-4,
      key.child_num::size(32), key.chain_code::binary, compressed_pub_key::binary>>}
   end
@@ -96,60 +94,107 @@ defmodule KeyPair do
   end
 
   def format_key(key) when is_map(key) do
-    IO.inspect key
     {prefix, data} = serialize(key)
     Base58Check.encode58check(prefix, data)
   end
 
   def derive(key, <<"m/", path::binary>>) do
-    KeyPair.derive_pathlist(key, :lists.map(fn(e) ->
-      case String.reverse(e) do
-        <<"'", hardened::binary>> ->
-          {num, _rest} = Integer.parse(String.reverse(hardened))
-          final = num + @mersenne_prime + 1
-          final
-        _ ->
-          {num, _rest} = Integer.parse(e)
-          num
-      end
-    end, :binary.split(path, <<"/">>, [:global])))
+    KeyPair.derive_pathlist(
+      key,
+      :lists.map(fn(elem) ->
+        case String.reverse(elem) do
+          <<"'", hardened::binary>> ->
+            {num, _rest} =
+              hardened
+              |> String.reverse()
+              |> Integer.parse()
+            num + @mersenne_prime + 1
+          _ ->
+            {num, _rest} = Integer.parse(elem)
+            num
+        end
+      end, :binary.split(path, <<"/">>, [:global])))
   end
 
-  def derive_pathlist(key, []) do
-    KeyPair.format_key(key)
-  end
+  def derive_pathlist(key, []), do: key
   def derive_pathlist(key, pathlist) do
     [index | rest] = pathlist
-    IO.inspect key
-    IO.inspect index
     KeyPair.derive_pathlist(derive_key(key, index), rest)
   end
 
-
   def derive_key(%Bip32PrivKey{depth: d} = key, index) when index <= @mersenne_prime do
     # Normal derivation
-    {child_key, child_chain} = KeyPair.child_key(key, index)
-    KeyPair.derive_key(key, child_key, child_chain, index)
+    compressed_pub_key =
+        KeyPair.generate_pub_key(key, :compressed)
+
+    <<derived_key::size(256), child_chain::binary>> =
+      :crypto.hmac(:sha512, key.chain_code,
+        <<compressed_pub_key::binary, index::size(32)>>)
+
+    <<parent_key_int::size(256)>> = key.key
+    child_key = rem(derived_key + parent_key_int, @n)
+
+    KeyPair.derive_key(key, :binary.encode_unsigned(child_key), child_chain, index)
   end
 
   def derive_key(%Bip32PrivKey{depth: d} = key, index) when index > @mersenne_prime do
     # Hardned derivation
-    {child_key, child_chain} = KeyPair.child_key(key, index)
-    KeyPair.derive_key(key, child_key, child_chain, index)
+    <<derived_key::size(256), child_chain::binary>> =
+      :crypto.hmac(:sha512, key.chain_code,
+        <<0::size(8), key.key::binary, index::size(32)>>)
+
+    <<key_int::size(256)>> = key.key
+    child_key = rem(derived_key + key_int, @n)
+    KeyPair.derive_key(key, :binary.encode_unsigned(child_key), child_chain, index)
   end
 
   def derive_key(%Bip32PubKey{depth: d} = key, index) when index <= @mersenne_prime do
     # Normal derivation
-    IO.inspect "Parent key"
-    IO.inspect key.key
-    {child_key, child_chain} = KeyPair.child_key(key, index)
-    KeyPair.derive_key(key, child_key, child_chain, index)
+    serialized_pub_key = KeyPair.compress(key.key)
+
+    <<derived_key::binary-32, child_chain::binary>> =
+      :crypto.hmac(:sha512, key.chain_code,
+        <<serialized_pub_key::binary, index::size(32)>>)
+
+   # {parent_key_int, _} =
+   #   key.key
+   #   |> Base.encode16()
+   #   |> Integer.parse(16)
+
+    {point, _} = :crypto.generate_key(:ecdh, :secp256k1, derived_key)
+
+    IO.inspect "#################  Parent key compressed  ##################"
+    IO.inspect(key.key, limit: :infinity)
+    IO.inspect "#################  Compressed Point  ###################"
+    IO.inspect(point, limit: :infinity)
+    IO.inspect "#################  Derived Key   ###################"
+    IO.inspect(derived_key, limit: :infinity)
+
+
+    {point_int, _} =
+      point
+      |> Base.encode16()
+      |> Integer.parse(16)
+
+    {parent_key_int, _} =
+      key.key
+      |> Base.encode16()
+      |> Integer.parse(16)
+
+    child_key =  point_int + parent_key_int
+
+    l = :binary.encode_unsigned(child_key) |> KeyPair.compress()
+
+
+    IO.inspect "################## L ##################"
+    IO.inspect point_int
+    IO.inspect parent_key_int
+    KeyPair.derive_key(key, :binary.encode_unsigned(child_key), child_chain, index)
   end
 
   def derive_key(%Bip32PubKey{depth: d} = key, index) when index > @mersenne_prime do
     # Hardned derivation
-    {child_key, child_chain} = KeyPair.child_key(key, index)
-    KeyPair.derive_key(key, child_key, child_chain, index)
+    throw("Cannot derive Public Hardened child")
   end
 
   def derive_key(key, child_key, child_chain, index) when is_map(key) do
@@ -159,68 +204,6 @@ defmodule KeyPair do
             depth: key.depth+1,
             f_print: KeyPair.fingerprint(key),
             child_num: index}
-  end
-
-
-  def child_key(%Bip32PrivKey{key: parent_key, chain_code: parent_chain_code} = key, index) do
-    <<derived_key::size(256), child_chain_code::binary>> =
-    if index > @mersenne_prime do # Hardned child
-      :crypto.hmac(:sha512,
-        parent_chain_code,
-        <<0::size(8), parent_key::binary, index::size(32)>>)
-    else # Normal child
-      compressed_pub_key =
-        KeyPair.generate_pub_key(key, :compressed)
-
-      :crypto.hmac(:sha512,
-        parent_chain_code,
-        <<compressed_pub_key::binary, index::size(32)>>)
-    end
-
-    <<parent_key_int::size(256)>> = parent_key
-    child_key = rem(derived_key + parent_key_int, @n)
-
-    {<<child_key::size(256)>>, child_chain_code}
-  end
-
-
-
-
-  def child_key(%Bip32PubKey{key: parent_key, chain_code: parent_chain_code} = key, index) do
-    serialized_public_key =
-      parent_key
-      |> KeyPair.compress()
-      |> Base.decode16!()
-
-    <<derived_key::size(256), child_chain_code::binary>> =
-    if index >= :math.pow(2, 31) do # Hardned child
-      raise("Hardened child")
-    else # Normal child
-      :crypto.hmac(:sha512,
-        parent_chain_code,
-        <<serialized_public_key::binary, index::size(32)>>)
-    end
-
-    {point, _} = :crypto.generate_key(:ecdh, :secp256k1, derived_key)
-
-    # Convert to integer value
-    point_int =
-      point
-      |> Bits.to_binary_list()
-      |> Enum.join()
-      |> Integer.parse(2)
-      |> elem(0)
-
-    # Convert to integer value Refactor this!!!!!!!!!!!!!!!!!!!!!!!
-    parent_key_int =
-      parent_key
-      |> Bits.to_binary_list()
-      |> Enum.join()
-      |> Integer.parse(2)
-      |> elem(0)
-
-    child_pub_key =  point_int + parent_key_int
-    {:binary.encode_unsigned(child_pub_key), child_chain_code}
   end
 
   @doc """
@@ -245,9 +228,7 @@ defmodule KeyPair do
       :crypto.hash(:sha256, public_add_netbytes))
 
     checksum_32bits = <<checksum::binary-4>>
-
-    public_add_netbytes <> checksum_32bits
-    |> Base58Check.encode58()
+    public_add_netbytes <> checksum_32bits |> Base58Check.encode58()
   end
 
   def compress(point) do
@@ -273,6 +254,6 @@ defmodule KeyPair do
         "02" <> first_half
       _ ->
         "03" <> first_half
-    end
+    end |> Base.decode16!()
   end
 end
