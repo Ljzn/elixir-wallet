@@ -152,43 +152,49 @@ defmodule KeyPair do
     # Normal derivation
     serialized_pub_key = KeyPair.compress(key.key)
 
-    <<derived_key::binary-32, child_chain::binary>> =
+    <<derived_key::256, child_chain::binary>> =
       :crypto.hmac(:sha512, key.chain_code,
         <<serialized_pub_key::binary, index::size(32)>>)
 
-   # {parent_key_int, _} =
-   #   key.key
-   #   |> Base.encode16()
-   #   |> Integer.parse(16)
-
     {point, _} = :crypto.generate_key(:ecdh, :secp256k1, derived_key)
 
-    IO.inspect "#################  Parent key compressed  ##################"
+    IO.inspect "#################  Parent key  ##################"
     IO.inspect(key.key, limit: :infinity)
-    IO.inspect "#################  Compressed Point  ###################"
+    IO.inspect "#################  Point  ###################"
     IO.inspect(point, limit: :infinity)
     IO.inspect "#################  Derived Key   ###################"
     IO.inspect(derived_key, limit: :infinity)
 
 
-    {point_int, _} =
-      point
-      |> Base.encode16()
-      |> Integer.parse(16)
+    ## MAGIC HAPPENS HERE !!!!
 
-    {parent_key_int, _} =
-      key.key
-      |> Base.encode16()
-      |> Integer.parse(16)
+    <<_rest::8, x_par::256, y_par::256>> = key.key
+    <<_rest::8, x_tw::256, y_tw::256>> = point
 
-    child_key =  point_int + parent_key_int
+    p = 115792089237316195423570985008687907853269984665640564039457584007908834671663
+    h = (y_tw - y_par) / (x_tw - y_par)
+    IO.inspect round(h)
+    lambda = rem(h, p)
+
+    x_r = rem((lambda*lambda - x_tw - x_par), p)
+    y_r = rem((lambda*(x_tw - x_r) - y_tw), p)
+
+    IO.inspect "################## X_R ##################"
+    IO.inspect(x_r, limit: :infinity)
+    IO.inspect "################## X_R ##################"
+    IO.inspect(y_r, limit: :infinity)
+
+
+    IO.inspect <<4::8, x_r::size(256), y_r::size(256)>> |> KeyPair.compress()
+
+    <<point_int::520>> = point
+    <<parent_key_int::264>> = serialized_pub_key
+
+    child_key = point_int + parent_key_int
 
     l = :binary.encode_unsigned(child_key) |> KeyPair.compress()
-
-
     IO.inspect "################## L ##################"
-    IO.inspect point_int
-    IO.inspect parent_key_int
+    IO.inspect l
     KeyPair.derive_key(key, :binary.encode_unsigned(child_key), child_chain, index)
   end
 
