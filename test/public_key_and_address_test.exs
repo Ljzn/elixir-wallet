@@ -17,8 +17,8 @@ defmodule PublicKeyAndAddressTest do
     assert "03c5064cad681b04d4cbd50198fee0097fa3068854d7cdee9bafaa64a8c3567151"
     = public_key_hex
 
-    address = KeyPair.generate_wallet_address(public_key_hex)
-    assert address == "15V1MArcmSz2HJPPBYpiGMjE3qf3NWvqVr"
+    address = KeyPair.generate_wallet_address(public_key.key |> KeyPair.compress())
+    assert "15V1MArcmSz2HJPPBYpiGMjE3qf3NWvqVr" = address
   end
 
   test "validate master public key and address 2" do
@@ -36,8 +36,8 @@ defmodule PublicKeyAndAddressTest do
     assert "03c405a99d6131a57a87eea17405e6f3a64f58460b02b2aaccd2b9d019eb0e364a"
     = public_key_hex
 
-    address = KeyPair.generate_wallet_address(public_key_hex)
-    assert address == "1AxB5DQqFVXpEAvfjzFPSRUHSqKY9w6YNQ"
+    address = KeyPair.generate_wallet_address(public_key.key |> KeyPair.compress())
+    assert "1AxB5DQqFVXpEAvfjzFPSRUHSqKY9w6YNQ" = address
   end
 
   test "validate master public key and address 3" do
@@ -55,8 +55,8 @@ defmodule PublicKeyAndAddressTest do
     assert "0293c4c922b503f7f58fbefcf866e1bda93d5891b9cf52dc292ff3958294a0f114"
     = public_key_hex
 
-    address = KeyPair.generate_wallet_address(public_key_hex)
-    assert address == "1GWgbn38wFCq5VT8PAMJ4DkzUj2RUnpGrX"
+    address = KeyPair.generate_wallet_address(public_key.key |> KeyPair.compress())
+    assert "1GWgbn38wFCq5VT8PAMJ4DkzUj2RUnpGrX" = address
   end
 
 end

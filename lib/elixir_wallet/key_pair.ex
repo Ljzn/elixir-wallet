@@ -181,12 +181,12 @@ defmodule KeyPair do
   @doc """
   Generates wallet address from a given public key
   ## Example
-      iex> KeyPair.generate_wallet_address("03AE1B3F8386C6F8B08745E290DA4F7B1B6EBD2287C2505567A2A311BA09EE53F3")
+      iex> KeyPair.generate_wallet_address(pub_key_binary)
       '1C7RcPXiqwnaJgfvLmoicS3AaBGYyKbiW8'
   """
-  @spec generate_wallet_address(String.t()) :: String.t()
+  @spec generate_wallet_address(Binary.t()) :: String.t()
   def generate_wallet_address(public_key) do
-    public_sha256 = :crypto.hash(:sha256, Base.decode16!(public_key, case: :mixed))
+    public_sha256 = :crypto.hash(:sha256, public_key)
 
     public_ripemd160 = :crypto.hash(:ripemd160, public_sha256)
 
