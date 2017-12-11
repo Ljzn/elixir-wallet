@@ -3,300 +3,185 @@ defmodule KeyPair do
   Module for generating master public and private key
   """
 
+
+  alias Structs.Bip32PubKey, as: PubKey
+  alias Structs.Bip32PrivKey, as: PrivKey
+
+
+  # Constant for generating the private_key / chain_code
+  @bitcoin_const "Bitcoin seed"
+
   # Integers modulo the order of the curve (referred to as n)
   @n 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
 
   # Mersenne number / TODO: type what it is used for
   @mersenne_prime 2147483647
 
-  # Network versions
-  @mainnet_ext_priv_key_version 0x0488ADE4
-  @mainnet_ext_pub_key_version  0x0488B21E
-  @testnet_ext_priv_key_version 0x04358394
-  @testnet_ext_pub_key_version  0x043587CF
 
-  # Default depth, child_num and fingerprint values, needed for extended keys
-  @depth 0
-  @child_num 0
-  @fingerprint 0
-
-  @doc """
-  Generating a root seed from given mnemonic phrase
-  to further ensure uniqueness of master keys.
-  ## Example
-      iex> KeyPair.generate_root_seed("mnemonic", "pass")
-
-      %{<<54, 67, 48, 53, 53, 55, 53, 53, 66, 49, 70, 54, 69, 57, 55, 68, 70, 70, 67,
-        49, 67, 52, 48, 67, 49, 66, 68, 52, 57, 49, 57, 67, 52, 56, 57, 51, 56, 66,
-        50, 49, 49, 49, 51, 57, 67, 49, 50, 67, 51, 70, ...>>,
-        <<48, 51, 67, 54, 68, 49, 51, 70, 57, 55, 57, 69, 49, 49, 56, 67, 57, 55, 48,
-        50, 57, 65, 51, 70, 50, 49, 48, 65, 65, 50, 48, 55, 67, 65, 54, 54, 57, 53,
-        57, 48, 56, 66, 65, 56, 49, 52, 50, 55, 49, 52, ...>>,
-        <<18, 216, 49, 31, 0, 27, 92, 61, 81, 76, 17, 212, 106, 24, 176, 124, 144, 111,
-        182, 17, 157, 236, 54, 168, 91, 92, 99, 234, 76, 232, 20, 169>>
-      }
-  """
-  @spec generate_root_seed(String.t(), String.t(), List.t()) :: Map.t()
-  def generate_root_seed(mnemonic, password \\ "", opts \\ []) do
-    generate_master_keys(SeedGenerator.generate(mnemonic, password, opts))
-  end
- 
-  def generate_master_keys(seed) do
-    private_key_bin = generate_master_private_key(seed)
-    public_key_bin = generate_master_public_key(private_key_bin)
-    chain_code = generate_chain_code(seed)
-
-    {private_key_bin, public_key_bin, chain_code}
+  def generate_seed(mnemonic, pass_phrase \\ "", opts \\ []) do
+    SeedGenerator.generate(mnemonic, pass_phrase, opts)
   end
 
-  @doc """
-  Generates Master Private key from a given seed
-  ## Example
-      iex> KeyPair.generate_master_private_key(seed)
-      <<151, 43, 128, 234, 7, 64, 2, 5, 246, 177, 61, 95, 255, 74, 81, 153, 86, 29,
-      239, 10, 108, 166, 204, 112, 64, 109, 229, 173, 36, 71, 148, 12>>
-  """
-  @spec generate_master_private_key(String.t()) :: Binary.t()
-  def generate_master_private_key(seed) do
-    <<private_key::binary-32, _::binary>> =
-      :crypto.hmac(:sha512, "Bitcoin seed", seed)
-
-    if private_key != 0 or private_key >= @n do
-      private_key
-    else
-      raise("Key Generation error")
-    end
+  def generate_master_key(seed_bin, :seed) do
+    generate_master_key(:crypto.hmac(:sha512, @bitcoin_const, seed_bin), :private)
   end
 
-  @doc """
-  Generates Master chain_code from a given seed
-  ## Example
-     iex> KeyPair.generate_chain_code(seed)
-     <<67, 167, 253, 44, 27, 74, 166, 183, 104, 36, 28, 188, 67, 240, 121, 58, 216,
-     119, 74, 55, 209, 147, 185, 140, 59, 235, 107, 66, 128, 219, 120, 99>>
-  """
-  @spec generate_chain_code(String.t()) :: Binary.t()
-  def generate_chain_code(seed) do
-    <<_::binary-32, chain_code::binary>> =
-      :crypto.hmac(:sha512, "Bitcoin seed", seed)
-    chain_code
+  def generate_master_key(<<priv_key::binary-32, chain_code::binary>>, :private) do
+    key = PrivKey.create(:mainnet)
+    key = %{key | key: priv_key, chain_code: chain_code}
+  end
+  def to_public_key(%PrivKey{} = priv_key) do
+    pub_key = KeyPair.generate_pub_key(priv_key)
+    key = PubKey.create(:mainnet)
+    key = %{key |
+            depth: priv_key.depth,
+            f_print: priv_key.f_print,
+            child_num: priv_key.child_num,
+            chain_code: priv_key.chain_code,
+            key: pub_key}
   end
 
-
-  @doc """
-  Generates Master Public key from a given private key
-  ## Example
-      iex>> KeyPair.generate_master_public_key(private_key_bin)
-      <<4, 65, 105, 235, 146, 231, 187, 34, 143, 142, 44, 32, 142, 66, 87, 92, 38, 30,
-      180, 56, 200, 2, 237, 56, 42, 88, 77, 74, 0, 77, 235, 17, 217, 199, 70, 191,
-      237, 30, 191, 249, 56, 198, 25, 138, 229, 249, 62, 16, 88, 210, ...>>
-  """
-  def generate_master_public_key(private_key_bin) do
-    {public_key, _} =
-      :crypto.generate_key(:ecdh, :secp256k1, private_key_bin)
-    public_key
+  def generate_pub_key(%PrivKey{key: priv_key} = key) do
+    {pub_key, _rest} = :crypto.generate_key(:ecdh, :secp256k1, priv_key)
+    pub_key
+  end
+  def generate_pub_key(%PrivKey{key: priv_key} = key, :compressed) do
+    key
+    |> KeyPair.generate_pub_key()
+    |> KeyPair.compress()
   end
 
-  @doc """
-  Derives an Extended Public key from a given seed and network
-  If a network is not specified, :mainnet will be used
-  ## Example
-      iex> KeyPair.derive_extend_pub_key(seed)
-      "xpub661MyMwAqRbcEicePgnmzt4kZxe4LSejJB5hN2xzQb3BVgBQXCnSDe869u2C66h97g3QiSmoPL2XfhLQ7ro9rjGncqrvzuimLY6T3Rrco2s"
-
-      iex> KeyPair.derive_extend_pub_key(seed, :testnet)
-      "tpubD6NzVbkrYhZ4WWoVqsmsCoQ7u5jiKq9nqofzib28kVo5Exr7bRdXN5nvPw6ycbeNuaaKL2HfvRraMsq1WiePkAj5gScEgSNzvVgroTkVymv"
-  """
-  @spec derive_extend_pub_key(String.t(), tuple()) :: String.t()
-  def derive_extend_pub_key(seed_hex, network \\ :mainnet) do
-    seed_bin = Base.decode16!(seed_hex, case: :mixed)
-    pub_key_ser =
-      generate_master_private_key(seed_bin)
-      |> generate_master_public_key()
-      |> serialize()
-      |> Base.decode16!()
-    key = %{network: network,
-            key_type: :public,
-            key_ser: pub_key_ser,
-            chain_code: generate_chain_code(seed_bin),
-            depth: @depth,
-            child_num: @child_num,
-            f_print: @fingerprint}
-    build_ext_key(key)
+  def fingerprint(%PrivKey{key: priv_key} = key) do
+    key
+    |> KeyPair.generate_pub_key(:compressed)
+    |> KeyPair.fingerprint()
+  end
+  def fingerprint(%PubKey{key: pub_key} = key) do
+    pub_key
+    |> KeyPair.compress()
+    |> KeyPair.fingerprint()
+  end
+  def fingerprint(pub_key) do
+    <<f_print::binary-4, _rest::binary>> =
+      :crypto.hash(:ripemd160, :crypto.hash(:sha256, pub_key))
+    f_print
   end
 
-  @doc """
-  Derives an Extended Private key from a given seed and network
-  If a network is not specified, :mainnet will be used
-  ## Example
-      iex> KeyPair.derive_extend_priv_key(seed)
-      "xprv9s21ZrQH143K2EYBHfFmdk821voZvyvsvxA6ZeZNrFWCcsrFyfUBfqocJdfZJYiSJxUQNVhjm36JXscMc4QcHhQsgBFq44zubmcoT9q4ptD"
-
-      iex> KeyPair.derive_extend_priv_key(seed, :testnet)
-      "tprv8ZgxMBicQKsPd3mhxE7GoPk1L4DnAVxtGW5DS4yqLDzgQUbLy2owBbB4DoqDJv6kgQ1BNbKVvPg6zjA6jGkZ6kgUCpU8iRixWsNDtmesuag"
-  """
-  @spec derive_extend_priv_key(String.t(), tuple()) :: String.t()
-  def derive_extend_priv_key(seed_hex, network \\ :mainnet) do
-    seed_bin = Base.decode16!(seed_hex, case: :mixed)
-    priv_key_ser = <<0x00::size(8), generate_master_private_key(seed_bin)::binary>>
-    key = %{network: network,
-            key_type: :private,
-            key_ser: priv_key_ser,
-            chain_code: generate_chain_code(seed_bin),
-            depth: @depth,
-            child_num: @child_num,
-            f_print: @fingerprint}
-    build_ext_key(key)
+  defp serialize(%PubKey{key: pub_key} = key) do
+    compressed_pub_key = KeyPair.compress(pub_key)
+    {<<key.version::size(32)>>, <<key.depth::size(8), key.f_print::binary-4,
+     key.child_num::size(32), key.chain_code::binary, compressed_pub_key::binary>>}
+  end
+  defp serialize(%PrivKey{} = key) do
+    {<<key.version::size(32)>>, <<key.depth::size(8), key.f_print::binary-4,
+     key.child_num::size(32), key.chain_code::binary, <<0::size(8)>>, key.key::binary>>}
   end
 
-  defp build_ext_key(%{network: :mainnet, key_type: :private} = key) do
-    build_ext_key(key, @mainnet_ext_priv_key_version)
-  end
-  defp build_ext_key(%{network: :mainnet, key_type: :public} = key) do
-    build_ext_key(key, @mainnet_ext_pub_key_version)
-  end
-  defp build_ext_key(%{network: :testnet, key_type: :private} = key) do
-    build_ext_key(key, @testnet_ext_priv_key_version)
-  end
-  defp build_ext_key(%{network: :testnet, key_type: :public} = key) do
-    build_ext_key(key, @testnet_ext_pub_key_version)
-  end
-  defp build_ext_key(key, version) do
-    concat(
-      version,
-      key.depth,
-      key.f_print,
-      key.child_num,
-      key.chain_code,
-      key.key_ser)
+  def format_key(key) when is_map(key) do
+    {prefix, data} = serialize(key)
+    Base58Check.encode58check(prefix, data)
   end
 
-  defp concat(version, depth, f_print, c_num, chain_code, key) do
-    add_checksum(
-      <<version    :: size(32),
-        depth      :: size(8),
-        f_print    :: size(32),
-        c_num      :: size(32),
-        chain_code :: binary,
-        key        :: binary>>)
+  def derive(key, <<"m/", path::binary>>) do ## Deriving private keys
+    KeyPair.derive(key, path, :private)
+  end
+  def derive(key, <<"M/", path::binary>>) do ## Deriving public keys
+    derive(key, path, :public)
+  end
+  def derive(key, path, type) do
+    KeyPair.derive_pathlist(
+      key,
+      :lists.map(fn(elem) ->
+        case String.reverse(elem) do
+          <<"'", hardened::binary>> ->
+            {num, _rest} =
+              hardened
+              |> String.reverse()
+              |> Integer.parse()
+            num + @mersenne_prime + 1
+          _ ->
+            {num, _rest} = Integer.parse(elem)
+            num
+        end
+      end, :binary.split(path, <<"/">>, [:global])),
+      type)
   end
 
-  defp add_checksum(struct_bin) do
-    double_hash = :crypto.hash(:sha256, :crypto.hash(:sha256, struct_bin))
-    checksum = <<double_hash::binary-4>>
-    extended_key = struct_bin <> checksum
-    Base58Check.encode58(extended_key)
+  def derive_pathlist(key, [], :private), do: key
+  def derive_pathlist(key, [], :public), do: KeyPair.to_public_key(key)
+  def derive_pathlist(key, pathlist, type) do
+    [index | rest] = pathlist
+    key
+    |> derive_key(index)
+    |> KeyPair.derive_pathlist(rest, type)
   end
 
 
-  @doc """
-  Derives a Child private key from the Parent private key,
-  the Parent chain code and an Index.
-  Each child key has an index:
-  - The normal child keys use indices 0 through 2^31-1.
-  - The hardened child keys use indices 2^31 through 2^32-1.
+  def derive_key(%PrivKey{} = key, index) when index > -1 and index <= @mersenne_prime do
+    # Normal derivation
+    compressed_pub_key =
+        KeyPair.generate_pub_key(key, :compressed)
 
-  ## Example
-      iex> KeyPair.child_private_key_derivation(parent_private_key, parent_chain_code, index)
-      {:ok,
-      61797785181236811324249699338969637019663168756836175393579080078724476532284,
-      <<86, 58, 152, 23, 56, 221, 230, 127, 46, 28, 224, 1, 196, 29, 147, 26, 60, 87,
-      154, 143, 242, 166, 99, 249, 89, 18, 116, 169, 175, 233, 182, 13>>}
-  """
-  @spec child_private_key_derivation(integer(), binary(), integer()) :: tuple()
-  def child_private_key_derivation(parent_private_key, parent_chain_code, index) do
-    serialized_private_key = <<parent_private_key::size(256)>>
-    serialized_index = <<index::size(32)>>
+    <<derived_key::size(256), child_chain::binary>> =
+      :crypto.hmac(:sha512, key.chain_code,
+        <<compressed_pub_key::binary, index::size(32)>>)
 
-    {point, _} = :crypto.generate_key(:ecdh, :secp256k1, serialized_private_key)
-    serialized_point =
-      point
-      |> serialize()
-      |> Base.decode16()
-      |> elem(1)
+    <<parent_key_int::size(256)>> = key.key
+    child_key = rem(derived_key + parent_key_int, @n)
 
-    <<child_type::size(256), child_chain_code::binary>> =
-    if index >= :math.pow(2, 31) do
-      # Hardned child
-      # Note: The 0x00 pads the private key to make it 33 bytes long
-      :crypto.hmac(:sha512,
-        parent_chain_code,
-        <<0x00>> <> serialized_private_key <> serialized_index)
-    else
-      # Normal child
-      :crypto.hmac(:sha512,
-        parent_chain_code,
-        serialized_point <> serialized_index)
-    end
-
-    child_private_key =  child_type + rem(parent_private_key, @n)
-
-    {:ok, child_private_key, child_chain_code}
+    KeyPair.derive_key(key, :binary.encode_unsigned(child_key), child_chain, index)
   end
 
-  @doc """
-  Derives a Child public key from the Parent public key,
-  the Parent chain code and an Index. Each child key has an index
-  The normal child keys use indices 0 through 2^31-1.
-  The hardened child keys use indices 2^31 through 2^32-1.
 
-  ## Example
-      iex> KeyPair.child_public_key_derivation(parent_public_key, parent_chain_code, index)
-      {:ok,
-      127652518182151425556078170022681412997553383754584782294509495601321664751124755532434492424716420923497491690018425271974096974768674940535524619008798327,
-      <<86, 58, 152, 23, 56, 221, 230, 127, 46, 28, 224, 1, 196, 29, 147, 26, 60, 87,
-      154, 143, 242, 166, 99, 249, 89, 18, 116, 169, 175, 233, 182, 13>>}
+  def derive_key(%PrivKey{} = key, index) when index > @mersenne_prime do
+    # Hardned derivation
+    <<derived_key::size(256), child_chain::binary>> =
+      :crypto.hmac(:sha512, key.chain_code,
+        <<0::size(8), key.key::binary, index::size(32)>>)
 
-  """
-  @spec child_public_key_derivation(binary(), binary(), integer())
-  :: {:ok, child_public_key :: integer(), child_chain_code :: binary()}
-  def child_public_key_derivation(parent_public_key, parent_chain_code, index) do
-    serialized_index = <<index::size(32)>>
-    serialized_public_key =
-      parent_public_key
-      |> serialize()
-      |> Base.decode16!()
+    <<key_int::size(256)>> = key.key
+    child_key = rem(derived_key + key_int, @n)
+    KeyPair.derive_key(key, :binary.encode_unsigned(child_key), child_chain, index)
+  end
 
-    <<child_type::size(256), child_chain_code::binary>> =
-    if index >= :math.pow(2, 31) do
-      # Hardned child
-      raise("Hardened child")
-    else
-      # Normal child
-        :crypto.hmac(:sha512,
-          parent_chain_code,
-          serialized_public_key  <> serialized_index)
-    end
 
-    {point, _} = :crypto.generate_key(:ecdh, :secp256k1, child_type)
+  def derive_key(%PubKey{} = key, index) when index > -1 and index <= @mersenne_prime do
+    # Normal derivation
+    serialized_pub_key = KeyPair.compress(key.key)
 
-    # Convert to integer value
-    point_int =
-      point
-      |> Bits.to_binary_list()
-      |> Enum.join()
-      |> Integer.parse(2)
-      |> elem(0)
+    <<derived_key::size(256), child_chain::binary>> =
+      :crypto.hmac(:sha512, key.chain_code,
+        <<serialized_pub_key::binary, index::size(32)>>)
 
-    # Convert to integer value
-    pub_int =
-      parent_public_key
-      |> Bits.to_binary_list()
-      |> Enum.join()
-      |> Integer.parse(2)
-      |> elem(0)
+    {point, _} = :crypto.generate_key(:ecdh, :secp256k1, derived_key)
 
-    child_public_key =  point_int + pub_int
+    <<point_int::size(520)>> = point
+    <<parent_key_int::size(264)>> = serialized_pub_key
 
-    {:ok, child_public_key, child_chain_code}
+    child_key = point_int + parent_key_int
+    KeyPair.derive_key(key, :binary.encode_unsigned(child_key), child_chain, index)
+  end
+
+
+  def derive_key(%PubKey{}, index) when index > @mersenne_prime do
+    # Hardned derivation
+    raise(RuntimeError, "Cannot derive Public Hardened child")
+  end
+
+
+  def derive_key(key, child_key, child_chain, index) when is_map(key) do
+    key = %{key |
+            key: child_key,
+            chain_code: child_chain,
+            depth: key.depth+1,
+            f_print: KeyPair.fingerprint(key),
+            child_num: index}
   end
 
   @doc """
   Generates wallet address from a given public key
   ## Example
-      iex> KeyPair.generate_wallet_address(<<4, 248, 61, 147, 39, 246, 10, 183, 202, 180, 8, 90, 254, 166, 88, 29, 183,
-      37, 46, 251, 55, 62, 133, 24, 97, 91, 217, 85, 215, 209, 196, 185, 157, 243,
-      64, 153, 54, 215, 51, 243, 112, 242, 93, 115, 254, 161, 110, 223, 219, ...>>)
+      iex> KeyPair.generate_wallet_address(pub_key_binary)
       '1C7RcPXiqwnaJgfvLmoicS3AaBGYyKbiW8'
   """
   @spec generate_wallet_address(Binary.t()) :: String.t()
@@ -315,12 +200,10 @@ defmodule KeyPair do
       :crypto.hash(:sha256, public_add_netbytes))
 
     checksum_32bits = <<checksum::binary-4>>
-
-    public_add_netbytes <> checksum_32bits
-    |> Base58Check.encode58()
+    public_add_netbytes <> checksum_32bits |> Base58Check.encode58()
   end
 
-  defp serialize(point) do
+  def compress(point) do
     first_half =
       point
       |> Base.encode16()
@@ -343,6 +226,6 @@ defmodule KeyPair do
         "02" <> first_half
       _ ->
         "03" <> first_half
-    end
+    end |> Base.decode16!()
   end
 end

@@ -18,12 +18,12 @@ defmodule Wallet do
   """
   @spec create_wallet(String.t(), String.t()) :: String.t()
   def create_wallet(password, pass_phrase \\ "") do
-
     mnemonic_phrase = Mnemonic.generate_phrase(GenerateIndexes.generate_indexes)
-    if (pass_phrase != "") do 
+
+    if (pass_phrase != "") do
       mnemonic_phrase_with_pass_phrase = mnemonic_phrase <> " " <> pass_phrase
       save_wallet_file(mnemonic_phrase_with_pass_phrase, password)
-    else 
+    else
       save_wallet_file(mnemonic_phrase, password)
     end
 
@@ -38,18 +38,18 @@ defmodule Wallet do
   """
   @spec import_wallet(String.t(), String.t(), String.t()) :: String.t()
   def import_wallet(mnemonic_phrase, password, pass_phrase \\ "") do
-    if (pass_phrase != "") do 
+    if (pass_phrase != "") do
       mnemonic_phrase_with_pass_phrase = mnemonic_phrase <> " " <> pass_phrase
       save_wallet_file(mnemonic_phrase_with_pass_phrase, password)
-    else 
+    else
       save_wallet_file(mnemonic_phrase, password)
     end
     Logger.info("You have successfully imported a wallet")
   end
- 
+
   @doc """
-  Decrypts a file and displays it's mnemonic phrase 
-  Will only return a phrase if the password is correct 
+  Decrypts a file and displays it's mnemonic phrase
+  Will only return a phrase if the password is correct
   ## Examples
       iex> Wallet.load_wallet_file("wallet--2017-10-31-14-54-39", "password")
       {:ok,
@@ -60,24 +60,23 @@ defmodule Wallet do
     case File.read(file_path) do
       {:ok, encrypted_data} ->
         mnemonic = Cypher.decrypt(encrypted_data, password)
-        if (String.valid? mnemonic) do 
+        if (String.valid? mnemonic) do
           mnemonic_list = String.split(mnemonic)
           pass_phrase_check = Enum.at(mnemonic_list, 12)
-        case pass_phrase_check do 
-          :nil -> {:ok , mnemonic}
-          result -> 
-            if result == pass_phrase do 
-              mnemonic = String.replace(mnemonic, " " <> pass_phrase, "")          
-              {:ok, mnemonic} 
-            else 
-              Logger.error("Invalid pass phrase")
-              {:error, "Invalid pass phrase"}
-            end
+        case pass_phrase_check do
+          :nil ->
+            {:ok , mnemonic}
+          result when result == pass_phrase ->
+            mnemonic = String.replace(mnemonic, " " <> pass_phrase, "")
+            {:ok, mnemonic}
+          _ ->
+            Logger.error("Invalid pass phrase")
+            {:error, "Invalid pass phrase"}
         end
-        else 
+        else
           Logger.error("Invalid password")
-          {:error, "Invalid password"}          
-        end  
+          {:error, "Invalid password"}
+        end
       {:error, :enoent} ->
         {:error, "The file does not exist."}
       {:error, :eaccess} ->
@@ -103,16 +102,17 @@ defmodule Wallet do
   """
   @spec get_public_key(String.t(), String.t(), String.t()) :: Tuple.t()
   def get_public_key(file_path, password, pass_phrase \\ "") do
-    
     case load_wallet_file(file_path, password, pass_phrase) do
-      {:ok, mnemonic} -> 
-        public_key = KeyPair.generate_root_seed(mnemonic, pass_phrase) 
-        |> elem(1)
-        {:ok, public_key}
+      {:ok, mnemonic} ->
+        master_key =
+          KeyPair.generate_seed(mnemonic, pass_phrase)
+          |> KeyPair.generate_master_key(:seed)
+        public_key = KeyPair.to_public_key(master_key)
+        {:ok, public_key.key}
       {:error, message} -> {:error, message}
     end
-  end 
-  
+  end
+
   @doc """
   Gets the wallet address
   Will only return an address if the password is correct
@@ -122,10 +122,9 @@ defmodule Wallet do
   """
   @spec get_address(String.t(), String.t(), String.t()) :: Tuple.t()
   def get_address(file_path, password, pass_phrase \\ "") do
-    
     case get_public_key(file_path, password, pass_phrase) do
-      {:ok, mnemonic} -> 
-        address = KeyPair.generate_wallet_address(mnemonic) 
+      {:ok, pub_key} ->
+        address = KeyPair.generate_wallet_address(pub_key)
         {:ok, address}
       {:error, message} -> {:error, message}
     end
@@ -141,12 +140,12 @@ defmodule Wallet do
   """
   @spec get_private_key(String.t(), String.t(), String.t()) :: Tuple.t()
   def get_private_key(file_path, password, pass_phrase \\ "") do
-
     case load_wallet_file(file_path, password, pass_phrase) do
-      {:ok, mnemonic} -> 
-        private_key = KeyPair.generate_root_seed(mnemonic, pass_phrase) 
-        |> elem(0)
-        {:ok, private_key}
+      {:ok, mnemonic} ->
+        private_key =
+          KeyPair.generate_seed(mnemonic, pass_phrase)
+          |> KeyPair.generate_master_key(:seed)
+        {:ok, private_key.key}
       {:error, message} -> {:error, message}
     end
   end
