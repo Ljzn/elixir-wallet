@@ -136,7 +136,7 @@ defmodule ChildKeyDerivation do
 
 
 
-  ## Not working!!!
+  ## The child pub key from a parent pub key derivation is not working, looking for a solution!!!
   #test "public_derivation" do
   #  seed = "000102030405060708090a0b0c0d0e0f" |> Base.decode16!(case: :mixed)
   #  master_key = KeyPair.generate_master_key(seed, :seed)

@@ -64,15 +64,14 @@ defmodule Wallet do
           mnemonic_list = String.split(mnemonic)
           pass_phrase_check = Enum.at(mnemonic_list, 12)
         case pass_phrase_check do
-          :nil -> {:ok , mnemonic}
-          result ->
-            if result == pass_phrase do
-              mnemonic = String.replace(mnemonic, " " <> pass_phrase, "")
-              {:ok, mnemonic}
-            else
-              Logger.error("Invalid pass phrase")
-              {:error, "Invalid pass phrase"}
-            end
+          :nil ->
+            {:ok , mnemonic}
+          result when result == pass_phrase ->
+            mnemonic = String.replace(mnemonic, " " <> pass_phrase, "")
+            {:ok, mnemonic}
+          _ ->
+            Logger.error("Invalid pass phrase")
+            {:error, "Invalid pass phrase"}
         end
         else
           Logger.error("Invalid password")
