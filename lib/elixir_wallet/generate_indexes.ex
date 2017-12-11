@@ -40,8 +40,8 @@ defmodule GenerateIndexes do
       iex> GenerateIndexes.generate_indexes()
       [674, 1135, 630, 1012, 624, 1428, 481, 1666, 693, 534, 1933, 628]
   """
-  @spec generate_indexes() :: List.t()
-  def generate_indexes() do
+  @spec generate_indexes :: List.t()
+  def generate_indexes do
     entropy = generate_entropy(@entropy_byte_size)
     checksum = generate_checksum(entropy, @entropy_byte_size)
 
@@ -82,9 +82,7 @@ defmodule GenerateIndexes do
       binary_to_byte(binary)
     end)
   end
-  def binary_to_byte(binary), do: Integer.parse(binary, 2) |> elem(0)
-
-
+  def binary_to_byte(binary), do: binary |> Integer.parse(2) |> elem(0)
 
   ## Private functions
 
@@ -93,13 +91,14 @@ defmodule GenerateIndexes do
   end
 
   defp generate_checksum(entropy, entropy_byte_size) do
-    checksum_length = ((entropy_byte_size * 8) / 32) |> trunc()
+    entropy_bit_size = entropy_byte_size * 8
+    checksum_length = trunc(entropy_bit_size / 32)
 
     ## Take the first 4 bits
     :crypto.hash(:sha256, entropy)
     |> Bits.to_binary_list()
     |> Enum.join()
-    |> String.slice(0..(checksum_length-1))
+    |> String.slice(0..(checksum_length - 1))
   end
 
   defp split(string_bits) do

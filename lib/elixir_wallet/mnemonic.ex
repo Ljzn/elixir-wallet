@@ -20,7 +20,7 @@ defmodule Mnemonic do
     |> String.trim()
   end
 
-  defp get_wordlist() do
+  defp get_wordlist do
     {:ok, word_list} = File.read "priv/wordlist.txt"
     word_list
     |> String.split("\n")
