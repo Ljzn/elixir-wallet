@@ -25,17 +25,17 @@ defmodule KeyPair do
 
   def generate_master_key(<<priv_key::binary-32, c_code::binary>>, :private) do
     key = PrivKey.create(:mainnet)
-    key = %{key | key: priv_key, chain_code: c_code}
+    %{key | key: priv_key, chain_code: c_code}
   end
   def to_public_key(%PrivKey{} = priv_key) do
     pub_key = KeyPair.generate_pub_key(priv_key)
     key = PubKey.create(:mainnet)
-    key = %{key |
-            depth: priv_key.depth,
-            f_print: priv_key.f_print,
-            child_num: priv_key.child_num,
-            chain_code: priv_key.chain_code,
-            key: pub_key}
+    %{key |
+      depth: priv_key.depth,
+      f_print: priv_key.f_print,
+      child_num: priv_key.child_num,
+      chain_code: priv_key.chain_code,
+      key: pub_key}
   end
 
   def generate_pub_key(%PrivKey{key: priv_key} = key) do

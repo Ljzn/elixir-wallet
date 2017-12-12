@@ -152,8 +152,8 @@ defmodule Wallet do
 
   defp save_wallet_file(mnemonic_phrase, password) do
     {{year, month, day}, {hours, minutes, seconds}} = :calendar.local_time()
-    file = "wallet--#{year}-#{month}-#{day}-#{hours}-#{minutes}-#{seconds}"
-    {:ok, file} = File.open(file, [:write])
+    file_name = "wallet--#{year}-#{month}-#{day}-#{hours}-#{minutes}-#{seconds}"
+    {:ok, file} = File.open(file_name, [:write])
 
     encrypted = Cypher.encrypt(mnemonic_phrase, password)
     IO.binwrite(file, encrypted)
