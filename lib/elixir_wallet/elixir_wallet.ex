@@ -20,7 +20,7 @@ defmodule Wallet do
   def create_wallet(password, pass_phrase \\ "") do
     mnemonic_phrase = Mnemonic.generate_phrase(GenerateIndexes.generate_indexes)
 
-    if (pass_phrase != "") do
+    if pass_phrase != "" do
       mnemonic_phrase_with_pass_phrase = mnemonic_phrase <> " " <> pass_phrase
       save_wallet_file(mnemonic_phrase_with_pass_phrase, password)
     else
@@ -38,7 +38,7 @@ defmodule Wallet do
   """
   @spec import_wallet(String.t(), String.t(), String.t()) :: String.t()
   def import_wallet(mnemonic_phrase, password, pass_phrase \\ "") do
-    if (pass_phrase != "") do
+    if pass_phrase != "" do
       mnemonic_phrase_with_pass_phrase = mnemonic_phrase <> " " <> pass_phrase
       save_wallet_file(mnemonic_phrase_with_pass_phrase, password)
     else
@@ -49,44 +49,44 @@ defmodule Wallet do
 
   @doc """
   Decrypts a file and displays it's mnemonic phrase
-  Will only return a phrase if the password is correct
-  ## Examples
-      iex> Wallet.load_wallet_file("wallet--2017-10-31-14-54-39", "password")
-      {:ok,
-      "spirit\r beach\r smile\r turn\r glance\r whale\r rack\r reflect\r marble\r cover\r enter\r pigeon"}
+  Will only return a mnemonic phrase if the password is correct
   """
-  @spec load_wallet_file(String.t(), String.t(), String.t()) :: Tuple.t()
+  @spec load_wallet(String.t(), String.t(), String.t()) :: Tuple.t()
   def load_wallet_file(file_path, password, pass_phrase \\ "") do
-    case File.read(file_path) do
-      {:ok, encrypted_data} ->
-        mnemonic = Cypher.decrypt(encrypted_data, password)
-        if (String.valid? mnemonic) do
+    load_wallet(File.read(file_path), password, pass_phrase)
+  end
+  def load_wallet({:ok, encrypted_data}, password, pass_phrase) do
+    mnemonic = Cypher.decrypt(encrypted_data, password)
+        if String.valid? mnemonic do
           mnemonic_list = String.split(mnemonic)
           pass_phrase_check = Enum.at(mnemonic_list, 12)
-        case pass_phrase_check do
-          :nil ->
-            {:ok , mnemonic}
-          result when result == pass_phrase ->
-            mnemonic = String.replace(mnemonic, " " <> pass_phrase, "")
-            {:ok, mnemonic}
-          _ ->
-            Logger.error("Invalid pass phrase")
-            {:error, "Invalid pass phrase"}
-        end
+          case pass_phrase_check do
+            :nil ->
+              {:ok , mnemonic}
+            result when result == pass_phrase ->
+              mnemonic = String.replace(mnemonic, " " <> pass_phrase, "")
+              {:ok, mnemonic}
+            _ ->
+              Logger.error("Invalid pass phrase")
+              {:error, "Invalid pass phrase"}
+          end
         else
           Logger.error("Invalid password")
           {:error, "Invalid password"}
         end
-      {:error, :enoent} ->
+  end
+  def load_wallet({:error, reason}, _password, _pass_phrase) do
+    case reason do
+      :enoent ->
         {:error, "The file does not exist."}
-      {:error, :eaccess} ->
+      :eaccess ->
         {:error, "Missing permision for reading the file,
         or for searching one of the parent directories."}
-      {:error, :eisdir} ->
+      :eisdir ->
         {:error, "The named file is a directory."}
-      {:error, :enotdir} ->
+      :enotdir ->
         {:error, "A component of the file name is not a directory."}
-      {:error, :enomem} ->
+      :enomem ->
         {:error, "There is not enough memory for the contents of the file."}
     end
   end
@@ -152,8 +152,8 @@ defmodule Wallet do
 
   defp save_wallet_file(mnemonic_phrase, password) do
     {{year, month, day}, {hours, minutes, seconds}} = :calendar.local_time()
-    file = "wallet--#{year}-#{month}-#{day}-#{hours}-#{minutes}-#{seconds}"
-    {:ok, file} = File.open(file, [:write])
+    file_name = "wallet--#{year}-#{month}-#{day}-#{hours}-#{minutes}-#{seconds}"
+    {:ok, file} = File.open(file_name, [:write])
 
     encrypted = Cypher.encrypt(mnemonic_phrase, password)
     IO.binwrite(file, encrypted)

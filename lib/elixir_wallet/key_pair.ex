@@ -3,42 +3,39 @@ defmodule KeyPair do
   Module for generating master public and private key
   """
 
-
   alias Structs.Bip32PubKey, as: PubKey
   alias Structs.Bip32PrivKey, as: PrivKey
 
-
   # Constant for generating the private_key / chain_code
-  @bitcoin_const "Bitcoin seed"
+  @bitcoin_key "Bitcoin seed"
 
   # Integers modulo the order of the curve (referred to as n)
   @n 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
 
   # Mersenne number / TODO: type what it is used for
-  @mersenne_prime 2147483647
-
+  @mersenne_prime 2_147_483_647
 
   def generate_seed(mnemonic, pass_phrase \\ "", opts \\ []) do
     SeedGenerator.generate(mnemonic, pass_phrase, opts)
   end
 
   def generate_master_key(seed_bin, :seed) do
-    generate_master_key(:crypto.hmac(:sha512, @bitcoin_const, seed_bin), :private)
+    generate_master_key(:crypto.hmac(:sha512, @bitcoin_key, seed_bin), :private)
   end
 
-  def generate_master_key(<<priv_key::binary-32, chain_code::binary>>, :private) do
+  def generate_master_key(<<priv_key::binary-32, c_code::binary>>, :private) do
     key = PrivKey.create(:mainnet)
-    key = %{key | key: priv_key, chain_code: chain_code}
+    %{key | key: priv_key, chain_code: c_code}
   end
   def to_public_key(%PrivKey{} = priv_key) do
     pub_key = KeyPair.generate_pub_key(priv_key)
     key = PubKey.create(:mainnet)
-    key = %{key |
-            depth: priv_key.depth,
-            f_print: priv_key.f_print,
-            child_num: priv_key.child_num,
-            chain_code: priv_key.chain_code,
-            key: pub_key}
+    %{key |
+      depth: priv_key.depth,
+      f_print: priv_key.f_print,
+      child_num: priv_key.child_num,
+      chain_code: priv_key.chain_code,
+      key: pub_key}
   end
 
   def generate_pub_key(%PrivKey{key: priv_key} = key) do
@@ -69,12 +66,20 @@ defmodule KeyPair do
 
   defp serialize(%PubKey{key: pub_key} = key) do
     compressed_pub_key = KeyPair.compress(pub_key)
-    {<<key.version::size(32)>>, <<key.depth::size(8), key.f_print::binary-4,
-     key.child_num::size(32), key.chain_code::binary, compressed_pub_key::binary>>}
+    {<<key.version::size(32)>>,
+     <<key.depth::size(8),
+     key.f_print::binary-4,
+     key.child_num::size(32),
+     key.chain_code::binary,
+     compressed_pub_key::binary>>}
   end
   defp serialize(%PrivKey{} = key) do
-    {<<key.version::size(32)>>, <<key.depth::size(8), key.f_print::binary-4,
-     key.child_num::size(32), key.chain_code::binary, <<0::size(8)>>, key.key::binary>>}
+    {<<key.version::size(32)>>,
+     <<key.depth::size(8),
+     key.f_print::binary-4,
+     key.child_num::size(32),
+     key.chain_code::binary,
+     <<0::size(8)>>, key.key::binary>>}
   end
 
   def format_key(key) when is_map(key) do
@@ -116,7 +121,6 @@ defmodule KeyPair do
     |> KeyPair.derive_pathlist(rest, type)
   end
 
-
   def derive_key(%PrivKey{} = key, index) when index > -1 and index <= @mersenne_prime do
     # Normal derivation
     compressed_pub_key =
@@ -127,11 +131,10 @@ defmodule KeyPair do
         <<compressed_pub_key::binary, index::size(32)>>)
 
     <<parent_key_int::size(256)>> = key.key
-    child_key = rem(derived_key + parent_key_int, @n)
+    child_key = :binary.encode_unsigned(rem(derived_key + parent_key_int, @n))
 
-    KeyPair.derive_key(key, :binary.encode_unsigned(child_key), child_chain, index)
+    KeyPair.derive_key(key, child_key, child_chain, index)
   end
-
 
   def derive_key(%PrivKey{} = key, index) when index > @mersenne_prime do
     # Hardned derivation
@@ -140,10 +143,10 @@ defmodule KeyPair do
         <<0::size(8), key.key::binary, index::size(32)>>)
 
     <<key_int::size(256)>> = key.key
-    child_key = rem(derived_key + key_int, @n)
-    KeyPair.derive_key(key, :binary.encode_unsigned(child_key), child_chain, index)
-  end
+    child_key = :binary.encode_unsigned(rem(derived_key + key_int, @n))
 
+    KeyPair.derive_key(key, child_key, child_chain, index)
+  end
 
   def derive_key(%PubKey{} = key, index) when index > -1 and index <= @mersenne_prime do
     # Normal derivation
@@ -158,22 +161,20 @@ defmodule KeyPair do
     <<point_int::size(520)>> = point
     <<parent_key_int::size(264)>> = serialized_pub_key
 
-    child_key = point_int + parent_key_int
-    KeyPair.derive_key(key, :binary.encode_unsigned(child_key), child_chain, index)
+    child_key = :binary.encode_unsigned(point_int + parent_key_int)
+    KeyPair.derive_key(key, child_key, child_chain, index)
   end
-
 
   def derive_key(%PubKey{}, index) when index > @mersenne_prime do
     # Hardned derivation
     raise(RuntimeError, "Cannot derive Public Hardened child")
   end
 
-
   def derive_key(key, child_key, child_chain, index) when is_map(key) do
     key = %{key |
             key: child_key,
             chain_code: child_chain,
-            depth: key.depth+1,
+            depth: key.depth + 1,
             f_print: KeyPair.fingerprint(key),
             child_num: index}
   end
@@ -221,11 +222,13 @@ defmodule KeyPair do
       |> String.slice(63, 63)
       |> Integer.parse(16)
 
-    case rem(last_digit_int, 2) do
-      0 ->
-        "02" <> first_half
-      _ ->
-        "03" <> first_half
-    end |> Base.decode16!()
+    compressed_key =
+      case rem(last_digit_int, 2) do
+        0 ->
+          "02" <> first_half
+        _ ->
+          "03" <> first_half
+      end
+    Base.decode16!(compressed_key)
   end
 end
