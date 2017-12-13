@@ -8,28 +8,34 @@ defmodule KeyPair do
 
   # Constant for generating the private_key / chain_code
   @bitcoin_key "Bitcoin seed"
+  @aeternity_key "Aeternity seed"
 
   # Integers modulo the order of the curve (referred to as n)
   @n 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
 
-  # Mersenne number / TODO: type what it is used for
+  # Used as guard for the key derivation type: normal / hardned
   @mersenne_prime 2_147_483_647
 
   def generate_seed(mnemonic, pass_phrase \\ "", opts \\ []) do
     SeedGenerator.generate(mnemonic, pass_phrase, opts)
   end
 
+  ## Generates Bitcoin master key when key type is not specified
+  ## Generates Aeternity master key if :ae is specified as key type
   def generate_master_key(seed_bin, :seed) do
-    generate_master_key(:crypto.hmac(:sha512, @bitcoin_key, seed_bin), :private)
+    generate_master_key(:crypto.hmac(:sha512, @bitcoin_key, seed_bin), :btc, :private)
   end
-
-  def generate_master_key(<<priv_key::binary-32, c_code::binary>>, :private) do
-    key = PrivKey.create(:mainnet)
+  def generate_master_key(seed_bin, :seed, :ae) do
+    generate_master_key(:crypto.hmac(:sha512, @aeternity_key, seed_bin), :ae, :private)
+  end
+  def generate_master_key(<<priv_key::binary-32, c_code::binary>>, currency, :private) do
+    key = PrivKey.create(:mainnet, currency)
     %{key | key: priv_key, chain_code: c_code}
   end
+
   def to_public_key(%PrivKey{} = priv_key) do
     pub_key = KeyPair.generate_pub_key(priv_key)
-    key = PubKey.create(:mainnet)
+    key = PubKey.create(:mainnet, priv_key.currency)
     %{key |
       depth: priv_key.depth,
       f_print: priv_key.f_print,
@@ -38,22 +44,22 @@ defmodule KeyPair do
       key: pub_key}
   end
 
-  def generate_pub_key(%PrivKey{key: priv_key} = key) do
+  def generate_pub_key(%PrivKey{key: priv_key}) do
     {pub_key, _rest} = :crypto.generate_key(:ecdh, :secp256k1, priv_key)
     pub_key
   end
-  def generate_pub_key(%PrivKey{key: priv_key} = key, :compressed) do
+  def generate_pub_key(%PrivKey{} = key, :compressed) do
     key
     |> KeyPair.generate_pub_key()
     |> KeyPair.compress()
   end
 
-  def fingerprint(%PrivKey{key: priv_key} = key) do
+  def fingerprint(%PrivKey{} = key) do
     key
     |> KeyPair.generate_pub_key(:compressed)
     |> KeyPair.fingerprint()
   end
-  def fingerprint(%PubKey{key: pub_key} = key) do
+  def fingerprint(%PubKey{key: pub_key}) do
     pub_key
     |> KeyPair.compress()
     |> KeyPair.fingerprint()
@@ -64,8 +70,8 @@ defmodule KeyPair do
     f_print
   end
 
-  defp serialize(%PubKey{key: pub_key} = key) do
-    compressed_pub_key = KeyPair.compress(pub_key)
+  defp serialize(%PubKey{} = key) do
+    compressed_pub_key = KeyPair.compress(key.key)
     {<<key.version::size(32)>>,
      <<key.depth::size(8),
      key.f_print::binary-4,
@@ -83,17 +89,17 @@ defmodule KeyPair do
   end
 
   def format_key(key) when is_map(key) do
-    {prefix, data} = serialize(key)
-    Base58Check.encode58check(prefix, data)
+    {prefix, bip32_serialization} = serialize(key)
+    Base58Check.encode58check(prefix, bip32_serialization)
   end
 
   def derive(key, <<"m/", path::binary>>) do ## Deriving private keys
-    KeyPair.derive(key, path, :private)
+    derive(key, path, :private)
   end
   def derive(key, <<"M/", path::binary>>) do ## Deriving public keys
     derive(key, path, :public)
   end
-  def derive(key, path, type) do
+  defp derive(key, path, type) do
     KeyPair.derive_pathlist(
       key,
       :lists.map(fn(elem) ->
@@ -171,37 +177,40 @@ defmodule KeyPair do
   end
 
   def derive_key(key, child_key, child_chain, index) when is_map(key) do
-    key = %{key |
-            key: child_key,
-            chain_code: child_chain,
-            depth: key.depth + 1,
-            f_print: KeyPair.fingerprint(key),
-            child_num: index}
+    %{key |
+      key: child_key,
+      chain_code: child_chain,
+      depth: key.depth + 1,
+      f_print: KeyPair.fingerprint(key),
+      child_num: index}
   end
 
   @doc """
   Generates wallet address from a given public key
-  ## Example
-      iex> KeyPair.generate_wallet_address(pub_key_binary)
-      '1C7RcPXiqwnaJgfvLmoicS3AaBGYyKbiW8'
+  Network ID Bitcoin bytes:
+    mainnet = "0x00"
+    testnet = "0x6F"
+  Network ID Aeternity bytes:
+    mainnet = "0x18"
+    testnet = "0x42"
   """
-  @spec generate_wallet_address(Binary.t()) :: String.t()
+  @spec generate_wallet_address(Binary.t(), tuple()) :: String.t()
   def generate_wallet_address(public_key) do
-    public_sha256 = :crypto.hash(:sha256, public_key)
+    generate_address(public_key)
+  end
+  def generate_wallet_address(public_key, :ae) do
+    generate_address(public_key, 0x18)
+  end
+  defp generate_address(public_key, net_bytes \\ 0x00) do
+    pub_ripemd160 = :crypto.hash(:ripemd160,
+      :crypto.hash(:sha256, public_key))
 
-    public_ripemd160 = :crypto.hash(:ripemd160, public_sha256)
+    pub_with_netbytes = <<net_bytes::size(8), pub_ripemd160::binary>>
 
-    # Network ID bytes:
-    # Main Network = "0x00"
-    # Test Network = "0x6F"
-    # Namecoin Net = "0x34"
-    public_add_netbytes = <<0x00::size(8), public_ripemd160::binary>>
+    <<checksum::binary-4, _rest::binary>> = :crypto.hash(:sha256,
+      :crypto.hash(:sha256, pub_with_netbytes))
 
-    checksum = :crypto.hash(:sha256,
-      :crypto.hash(:sha256, public_add_netbytes))
-
-    checksum_32bits = <<checksum::binary-4>>
-    public_add_netbytes <> checksum_32bits |> Base58Check.encode58()
+    pub_with_netbytes <> checksum |> Base58Check.encode58()
   end
 
   def compress(point) do

@@ -3,20 +3,34 @@ defmodule Structs.Bip32PubKey do
   Module for holding the struct for a BIP32 Public key
   """
 
-  # Network versions
-  @mainnet_ext_pub_key_version  0x0488B21E
-  @testnet_ext_pub_key_version  0x043587CF
+  ## Network versions
 
-  defstruct [:version, :depth, :f_print, :child_num, :chain_code, :key]
+  # Bitcoin
+  @mainnet_btc_prefix 0x0488B21E
+  @testnet_btc_prefix 0x043587CF
 
-  def create(:mainnet) do
-    default(@mainnet_ext_pub_key_version)
+  #Aeternity
+  @mainnet_ae_prefix 0x9E850AC9
+  @testnet_ae_prefix 0x043587CF
+
+  defstruct [:currency, :version, :depth, :f_print, :child_num, :chain_code, :key]
+
+  def create(:mainnet, :btc) do
+    default(@mainnet_btc_prefix, :btc)
   end
-  def create(:testnet) do
-    default(@testnet_ext_pub_key_version)
+  def create(:testnet, :btc) do
+    default(@testnet_btc_prefix, :btc)
   end
-  defp default(version) do
+  def create(:mainnet, :ae) do
+    default(@mainnet_ae_prefix, :ae)
+  end
+  def create(:testnet, :ae) do
+    default(@testnet_ae_prefix, :ae)
+  end
+
+  defp default(version, currency) do
     %Structs.Bip32PubKey{
+      currency: currency,
       version: version,
       depth: 0,
       f_print: <<0::32>>,
