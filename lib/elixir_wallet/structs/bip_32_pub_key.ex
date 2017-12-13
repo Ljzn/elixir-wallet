@@ -10,8 +10,8 @@ defmodule Structs.Bip32PubKey do
   @testnet_btc_prefix 0x043587CF
 
   #Aeternity
-  @mainnet_ae_prefix 0x9E850AC9
-  @testnet_ae_prefix 0x043587CF
+  @mainnet_ae_prefix 0x9E86B78E
+  @testnet_ae_prefix 0xF350DAF8
 
   defstruct [:currency, :version, :depth, :f_print, :child_num, :chain_code, :key]
 
