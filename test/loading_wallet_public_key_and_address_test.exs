@@ -61,7 +61,7 @@ defmodule LoadPublicKeyAndAddressTest do
   test "validate master public key and address 5" do
     mnemonic = Wallet.load_wallet_file("test/test_wallets/wallet--2017-11-1-16-36-0", "password")
     assert {:ok, "year\r wage\r suggest\r cream\r good\r length\r umbrella\r ridge\r winter\r giant\r blast\r improve"}
-    mnemonic
+    = mnemonic
 
     {:ok, public_key} =
       Wallet.get_public_key("test/test_wallets/wallet--2017-11-1-16-36-0", "password")

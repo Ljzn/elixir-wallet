@@ -3,20 +3,34 @@ defmodule Structs.Bip32PrivKey do
   Module for holding the struct for a BIP32 Private key
   """
 
-  # Network versions
-  @mainnet_ext_priv_key_version 0x0488ADE4
-  @testnet_ext_priv_key_version 0x04358394
+  ## Network versions
 
-  defstruct [:version, :depth, :f_print, :child_num, :chain_code, :key]
+  # Bitcoin
+  @mainnet_btc_prefix 0x0488ADE4
+  @testnet_btc_prefix 0x04358394
 
-  def create(:mainnet) do
-    default(@mainnet_ext_priv_key_version)
+  #Aeternity
+  @mainnet_ae_prefix 0x9E850AC9
+  @testnet_ae_prefix 0x9E850AC9
+
+  defstruct [:currency, :version, :depth, :f_print, :child_num, :chain_code, :key]
+
+  def create(:mainnet, :btc) do
+    default(@mainnet_btc_prefix, :btc)
   end
-  def create(:testnet) do
-    default(@testnet_ext_priv_key_version)
+  def create(:testnet, :btc) do
+    default(@testnet_btc_prefix, :btc)
   end
-  defp default(version) do
+  def create(:mainnet, :ae) do
+    default(@mainnet_ae_prefix, :ae)
+  end
+  def create(:testnet, :ae) do
+    default(@testnet_ae_prefix, :ae)
+  end
+
+  defp default(version, currency) do
     %Structs.Bip32PrivKey{
+      currency: currency,
       version: version,
       depth: 0,
       f_print: <<0::32>>,
