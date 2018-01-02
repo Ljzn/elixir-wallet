@@ -183,7 +183,6 @@ test "bip32_vectors_1_btc" do
     public_master_key =
       master_key
       |> KeyPair.derive("M/0'/1/2'/2")
-    IO.inspect public_master_key
     public_child_key = public_master_key |> KeyPair.derive("M/1000000000")
 
     ## Chain m/0h/1/2h/2/1000000000

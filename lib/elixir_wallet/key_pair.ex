@@ -163,13 +163,6 @@ defmodule KeyPair do
       :crypto.hmac(:sha512, key.chain_code,
         <<serialized_pub_key::binary, index::size(32)>>)
 
-    ##{point, _} = :crypto.generate_key(:ecdh, :secp256k1, derived_key)
-
-    #<<point_int::size(520)>> = point
-    #<<parent_key_int::size(264)>> = serialized_pub_key
-
-    #child_key = :binary.encode_unsigned(point_int + parent_key_int)
-
     {:ok, child_key} = :libsecp256k1.ec_pubkey_tweak_add(key.key, derived_key)
 
     KeyPair.derive_key(key, child_key, child_chain, index)
