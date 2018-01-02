@@ -177,17 +177,17 @@ test "bip32_vectors_1_btc" do
 
 
   ## The child pub key from a parent pub key derivation is not working, looking for a solution!!!
-  #test "public_derivation" do
-  #  seed = "000102030405060708090a0b0c0d0e0f" |> Base.decode16!(case: :mixed)
-  #  master_key = KeyPair.generate_master_key(seed, :seed)
-  #  public_master_key =
-  #    master_key
-  #    |> KeyPair.derive("m/0'/1/2'/2")
-  #    |> KeyPair.generate_master_key(:public)
-  #  public_child_key = public_master_key |> KeyPair.derive("m/1000000000")
+  test "public_derivation" do
+    seed = "000102030405060708090a0b0c0d0e0f" |> Base.decode16!(case: :mixed)
+    master_key = KeyPair.generate_master_key(seed, :seed)
+    public_master_key =
+      master_key
+      |> KeyPair.derive("M/0'/1/2'/2")
+    IO.inspect public_master_key
+    public_child_key = public_master_key |> KeyPair.derive("M/1000000000")
 
     ## Chain m/0h/1/2h/2/1000000000
-  #  assert "xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy"
-  #  = KeyPair.format_key(public_child_key)
-  #end
+    assert "xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy"
+    = KeyPair.format_key(public_child_key)
+  end
 end
