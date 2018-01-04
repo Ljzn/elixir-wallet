@@ -118,8 +118,9 @@ defmodule KeyPair do
       type)
   end
 
-  def derive_pathlist(key, [], :private), do: key
-  def derive_pathlist(key, [], :public), do: KeyPair.to_public_key(key)
+  def derive_pathlist(%PrivKey{} = key, [], :private), do: key
+  def derive_pathlist(%PrivKey{} = key, [], :public), do: KeyPair.to_public_key(key)
+  def derive_pathlist(%PubKey{} = key, [], :public), do: key
   def derive_pathlist(key, pathlist, type) do
     [index | rest] = pathlist
     key
@@ -158,16 +159,12 @@ defmodule KeyPair do
     # Normal derivation
     serialized_pub_key = KeyPair.compress(key.key)
 
-    <<derived_key::size(256), child_chain::binary>> =
+    <<derived_key::binary-32, child_chain::binary>> =
       :crypto.hmac(:sha512, key.chain_code,
         <<serialized_pub_key::binary, index::size(32)>>)
 
-    {point, _} = :crypto.generate_key(:ecdh, :secp256k1, derived_key)
+    {:ok, child_key} = :libsecp256k1.ec_pubkey_tweak_add(key.key, derived_key)
 
-    <<point_int::size(520)>> = point
-    <<parent_key_int::size(264)>> = serialized_pub_key
-
-    child_key = :binary.encode_unsigned(point_int + parent_key_int)
     KeyPair.derive_key(key, child_key, child_chain, index)
   end
 
