@@ -87,12 +87,12 @@ Once we have the master extended keys we can use them to derive children using t
 
 If we want to derive child private key we will use lowercase `m` in the path
 ```elixir
-KeyPair.derive("m/0'", extended_priv_key)
+KeyPair.derive(extended_priv_key, "m/0'")
 ```
 
 If we want to derive child public key we will use uppercase `M` in the path
 ```elixir
-KeyPair.derive("M/0'", extended_priv_key)
+KeyPair.derive(extended_priv_key, "M/0'")
 ```
 
 To derive hardned key use an apostrophe `'` sign after the number and a slash `/` to go deeper in the hierarchy
@@ -117,6 +117,12 @@ For the address use the following Network bytes:
 
 ## Installation
 
+Make sure you have installed the following packages to make sure that the dependency `libsecp256k1` will work properly:
+```bash
+sudo apt-get install autoconf autogen
+sudo apt-get install libtool
+sudo apt-get install libgmp3-dev
+```
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed
 by adding `elixir_wallet` to your list of dependencies in `mix.exs`:
