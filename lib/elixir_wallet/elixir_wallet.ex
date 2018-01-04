@@ -106,7 +106,7 @@ defmodule Wallet do
       {:ok, mnemonic} ->
         master_key =
           KeyPair.generate_seed(mnemonic, pass_phrase)
-          |> KeyPair.generate_master_key(:seed)
+          |> KeyPair.generate_master_key(:btc)
         public_key = KeyPair.to_public_key(master_key)
         {:ok, public_key.key}
       {:error, message} -> {:error, message}
@@ -124,7 +124,7 @@ defmodule Wallet do
   def get_address(file_path, password, pass_phrase \\ "") do
     case get_public_key(file_path, password, pass_phrase) do
       {:ok, pub_key} ->
-        address = KeyPair.generate_wallet_address(pub_key)
+        address = KeyPair.generate_wallet_address(pub_key, :btc)
         {:ok, address}
       {:error, message} -> {:error, message}
     end
@@ -144,7 +144,7 @@ defmodule Wallet do
       {:ok, mnemonic} ->
         private_key =
           KeyPair.generate_seed(mnemonic, pass_phrase)
-          |> KeyPair.generate_master_key(:seed)
+          |> KeyPair.generate_master_key(:btc)
         {:ok, private_key.key}
       {:error, message} -> {:error, message}
     end

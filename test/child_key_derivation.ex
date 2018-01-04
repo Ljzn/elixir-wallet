@@ -4,7 +4,7 @@ defmodule ChildKeyDerivation do
 
 test "bip32_vectors_1_aeternity" do
     seed = "000102030405060708090a0b0c0d0e0f" |> Base.decode16!(case: :mixed)
-    master_key = KeyPair.generate_master_key(seed, :seed, :ae)
+    master_key = KeyPair.generate_master_key(seed, :ae)
 
     ## Chain m
     assert "aeub7C9vNZ1egvxzQXZo3vTennMNQNsW8CW2dgjAHAz56ZkdY8GBsDbTMJ45vaUrZau5YjgnNeSUWJg8DFxYTnSmF3MEAYY4QfnYebhWVwgYX3Mq"
@@ -30,7 +30,7 @@ test "bip32_vectors_1_aeternity" do
 test "bip32_vectors_2_aeternity" do
     seed = "fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542"
     |> Base.decode16!(case: :mixed)
-    master_key = KeyPair.generate_master_key(seed, :seed, :ae)
+    master_key = KeyPair.generate_master_key(seed, :ae)
 
     ## Chain m/0/2147483647h/1
     assert "aeub7CHDFCHJN24dmbFmfUQzCvgvgufhqWGQDAPDLbko8PBwNobZhtJPq8LrXxWWkNoTpjnCNW12gucwWwBtJoU4mHfkGszbrQXX5x65VYyFVisf"
@@ -59,7 +59,7 @@ test "bip32_vectors_2_aeternity" do
 
 test "bip32_vectors_1_btc" do
     seed = "000102030405060708090a0b0c0d0e0f" |> Base.decode16!(case: :mixed)
-    master_key = KeyPair.generate_master_key(seed, :seed)
+    master_key = KeyPair.generate_master_key(seed, :btc)
 
     ## Chain m
     assert "xpub661MyMwAqRbcFtXgS5sYJABqqG9YLmC4Q1Rdap9gSE8NqtwybGhePY2gZ29ESFjqJoCu1Rupje8YtGqsefD265TMg7usUDFdp6W1EGMcet8"
@@ -107,7 +107,7 @@ test "bip32_vectors_1_btc" do
   test "bip32_vectors_2_btc" do
     seed = "fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542"
     |> Base.decode16!(case: :mixed)
-    master_key = KeyPair.generate_master_key(seed, :seed)
+    master_key = KeyPair.generate_master_key(seed, :btc)
 
     ## Chain m
     assert "xpub661MyMwAqRbcFW31YEwpkMuc5THy2PSt5bDMsktWQcFF8syAmRUapSCGu8ED9W6oDMSgv6Zz8idoc4a6mr8BDzTJY47LJhkJ8UB7WEGuduB"
@@ -159,7 +159,7 @@ test "bip32_vectors_1_btc" do
 
   test "error derivation btc" do
     seed = "000102030405060708090a0b0c0d0e0f" |> Base.decode16!(case: :mixed)
-    master_key = KeyPair.generate_master_key(seed, :seed)
+    master_key = KeyPair.generate_master_key(seed, :btc)
 
     public_master_key =
       master_key
@@ -176,7 +176,7 @@ test "bip32_vectors_1_btc" do
 
   test "public_derivation" do
     seed = "000102030405060708090a0b0c0d0e0f" |> Base.decode16!(case: :mixed)
-    master_key = KeyPair.generate_master_key(seed, :seed)
+    master_key = KeyPair.generate_master_key(seed, :btc)
     public_master_key =
       master_key
       |> KeyPair.derive("M/0'/1/2'/2")

@@ -22,18 +22,16 @@ defmodule KeyPair do
 
   @doc """
   Generates master private extended key.
-  If Currency is not specified a `Bitcoin` key will be created
   ## Examples
-      iex> generate_master_key(seed_bin, :seed)
+      iex> generate_master_key(seed_bin, :btc)
       master_extended_btc_key
 
-      iex> generate_master_key(seed_bin, :seed, :ae)
+      iex> generate_master_key(seed_bin, :ae)
       master_extended_ae_key
 
   ## Currencies
-
-     -  `:ae`  - Creates an `Aeternity` key
      -  `:btc` - Creates a `Bitcoin` key
+     -  `:ae`  - Creates an `Aeternity` key
   """
   @spec generate_master_key(Binary.t(), currency::Atom.t()) :: extended_key::Map.t()
   def generate_master_key(seed_bin, :btc) do
@@ -43,7 +41,7 @@ defmodule KeyPair do
      build_master_key(:crypto.hmac(:sha512, @aeternity_key, seed_bin), :ae)
   end
   def generate_master_key(_, currency) do
-     IO.warn("This cryptocurrency is not supported! Check the doc for more info.")
+     IO.warn("The cryptocurrency #{currency} is not supported! Check the doc for more info.")
   end
 
   defp build_master_key(<<priv_key::binary-32, c_code::binary>>, currency) do
@@ -69,7 +67,7 @@ defmodule KeyPair do
   def generate_pub_key(%PrivKey{} = key, :compressed) do
     key
     |> KeyPair.generate_pub_key()
-    |> KeyPair.compress()
+    |> compress()
   end
 
   def fingerprint(%PrivKey{} = key) do
@@ -79,7 +77,7 @@ defmodule KeyPair do
   end
   def fingerprint(%PubKey{key: pub_key}) do
     pub_key
-    |> KeyPair.compress()
+    |> compress()
     |> KeyPair.fingerprint()
   end
   def fingerprint(pub_key) do
@@ -175,7 +173,7 @@ defmodule KeyPair do
 
   def derive_key(%PubKey{} = key, index) when index > -1 and index <= @mersenne_prime do
     # Normal derivation
-    serialized_pub_key = KeyPair.compress(key.key)
+    serialized_pub_key = compress(key.key)
 
     <<derived_key::binary-32, child_chain::binary>> =
       :crypto.hmac(:sha512, key.chain_code,
@@ -202,15 +200,17 @@ defmodule KeyPair do
 
   @doc """
   Generates wallet address from a given public key
-  Network ID Bitcoin bytes:
-    mainnet = "0x00"
-    testnet = "0x6F"
-  Network ID Aeternity bytes:
-    mainnet = "0x18"
-    testnet = "0x42"
+
+  Network ID `Bitcoin` bytes:
+    -  mainnet = `0x00`
+    -  testnet = `0x6F`
+
+  Network ID `Aeternity` bytes:
+    -  mainnet = `0x18`
+    -  testnet = `0x42`
   """
   @spec generate_wallet_address(Binary.t(), tuple()) :: String.t()
-  def generate_wallet_address(public_key) do
+  def generate_wallet_address(public_key, :btc) do
     generate_address(public_key)
   end
   def generate_wallet_address(public_key, :ae) do
