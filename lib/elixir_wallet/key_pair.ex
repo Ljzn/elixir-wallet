@@ -20,15 +20,33 @@ defmodule KeyPair do
     SeedGenerator.generate(mnemonic, pass_phrase, opts)
   end
 
-  ## Generates Bitcoin master key when key type is not specified
-  ## Generates Aeternity master key if :ae is specified as key type
-  def generate_master_key(seed_bin, :seed) do
-    generate_master_key(:crypto.hmac(:sha512, @bitcoin_key, seed_bin), :btc, :private)
+  @doc """
+  Generates master private extended key.
+  If Currency is not specified a `Bitcoin` key will be created
+  ## Examples
+      iex> generate_master_key(seed_bin, :seed)
+      master_extended_btc_key
+
+      iex> generate_master_key(seed_bin, :seed, :ae)
+      master_extended_ae_key
+
+  ## Currencies
+
+     -  `:ae`  - Creates an `Aeternity` key
+     -  `:btc` - Creates a `Bitcoin` key
+  """
+  @spec generate_master_key(Binary.t(), currency::Atom.t()) :: extended_key::Map.t()
+  def generate_master_key(seed_bin, :btc) do
+     build_master_key(:crypto.hmac(:sha512, @bitcoin_key, seed_bin), :btc)
   end
-  def generate_master_key(seed_bin, :seed, :ae) do
-    generate_master_key(:crypto.hmac(:sha512, @aeternity_key, seed_bin), :ae, :private)
+  def generate_master_key(seed_bin, :ae) do
+     build_master_key(:crypto.hmac(:sha512, @aeternity_key, seed_bin), :ae)
   end
-  def generate_master_key(<<priv_key::binary-32, c_code::binary>>, currency, :private) do
+  def generate_master_key(_, currency) do
+     IO.warn("This cryptocurrency is not supported! Check the doc for more info.")
+  end
+
+  defp build_master_key(<<priv_key::binary-32, c_code::binary>>, currency) do
     key = PrivKey.create(:mainnet, currency)
     %{key | key: priv_key, chain_code: c_code}
   end
