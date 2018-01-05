@@ -1,4 +1,4 @@
-defmodule GenerateIndexes do
+defmodule ElixirWallet.GenerateIndexes do
   @moduledoc """
   Module for generating indexes used by the Mnemnonic module
   to generate a phrase from the wordlist
@@ -30,6 +30,8 @@ defmodule GenerateIndexes do
       |  224  |  7 |   231  |  21  |
       |  256  |  8 |   264  |  24  |
   """
+
+  alias ElixirWallet.Bits, as: Bits
 
   ## 128 bits in bytes
   @entropy_byte_size 16

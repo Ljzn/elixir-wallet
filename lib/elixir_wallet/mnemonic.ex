@@ -1,4 +1,4 @@
-defmodule Mnemonic do
+defmodule ElixirWallet.Mnemonic do
   @moduledoc """
   Module for generating a mnemonic phrase following the BIP-39 standard
   """

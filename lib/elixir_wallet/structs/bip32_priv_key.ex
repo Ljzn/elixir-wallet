@@ -1,4 +1,4 @@
-defmodule Structs.Bip32PrivKey do
+defmodule ElixirWallet.Structs.Bip32PrivKey do
   @moduledoc """
   Module for holding the struct for a BIP32 Private key
   """
@@ -29,7 +29,7 @@ defmodule Structs.Bip32PrivKey do
   end
 
   defp default(version, currency) do
-    %Structs.Bip32PrivKey{
+    %ElixirWallet.Structs.Bip32PrivKey{
       currency: currency,
       version: version,
       depth: 0,

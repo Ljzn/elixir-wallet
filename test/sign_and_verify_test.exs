@@ -2,12 +2,14 @@ defmodule SigningAndVerifyingTest do
   use ExUnit.Case
   doctest ElixirWallet
 
+  alias ElixirWallet.Signing, as: Signing
+
   test "validate signing and verifying transaction 1" do
     message = <<0,1>>
     privkey_bin = <<127, 192, 0, 152, 74, 57, 205, 167, 81, 245, 120, 212, 148, 133, 223, 98, 103, 153, 195, 51, 47, 5, 241, 37, 50, 99, 85, 77, 69, 249, 32, 203>>
 
     signature = Signing.sign(message, privkey_bin)
-   
+
     {_, public_key} = Base.decode16("04C232B177F8EDB01290C3FEDBE5231BDF67AEF24F4C7947B06A298C5CDA573E16ADB2A621525C44222D29E113B315508B32364584EDF99F8DE7E0D7C2D2A871AB")
     verification = Signing.verify(message, signature, public_key)
     assert verification == true
@@ -44,7 +46,7 @@ defmodule SigningAndVerifyingTest do
     {_, public_key} = Base.decode16("04B9A2BF7834AF55B1BC4356F74A11D8A8D1AA4CFC9635699FCE71C2F9186B5EC07EE55CC8452A9C3535589EA12D792FEA4E907C2FE0E1E0AEAF91D86E033607C1")
     verification = Signing.verify(message, signature, public_key)
     assert verification == true
-  end    
+  end
 
   test "validate signing and verifying transaction 5" do
     message = <<0,1,5,6>>

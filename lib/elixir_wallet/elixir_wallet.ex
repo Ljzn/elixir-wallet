@@ -1,10 +1,13 @@
-defmodule Wallet do
+defmodule ElixirWallet.Wallet do
   require Logger
 
   @moduledoc """
   This module is used for creation of the Wallet file. To inspect it use
   WalletCrypto.decrypt_wallet("wallet_file_name", "password", "mnemonic_phrase")
   """
+
+  alias ElixirWallet.KeyPair, as: KeyPair
+  alias ElixirWallet.Cypher, as: Cypher
 
   @doc """
   Creates a wallet file

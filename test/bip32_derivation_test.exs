@@ -1,8 +1,9 @@
-defmodule ChildKeyDerivation do
+defmodule Bip32DerivationTest do
   use ExUnit.Case
 
+  alias ElixirWallet.KeyPair, as: KeyPair
 
-test "bip32_vectors_1_aeternity" do
+  test "bip32_vectors_1_aeternity" do
     seed = "000102030405060708090a0b0c0d0e0f" |> Base.decode16!(case: :mixed)
     master_key = KeyPair.generate_master_key(seed, :ae)
 
@@ -27,7 +28,7 @@ test "bip32_vectors_1_aeternity" do
     = master_key |> KeyPair.derive("m/0'/1") |> KeyPair.format_key()
   end
 
-test "bip32_vectors_2_aeternity" do
+  test "bip32_vectors_2_aeternity" do
     seed = "fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542"
     |> Base.decode16!(case: :mixed)
     master_key = KeyPair.generate_master_key(seed, :ae)
@@ -57,7 +58,7 @@ test "bip32_vectors_2_aeternity" do
     = master_key |> KeyPair.derive("m/0/2147483647'/1/2147483646'/2") |> KeyPair.format_key()
   end
 
-test "bip32_vectors_1_btc" do
+  test "bip32_vectors_1_btc" do
     seed = "000102030405060708090a0b0c0d0e0f" |> Base.decode16!(case: :mixed)
     master_key = KeyPair.generate_master_key(seed, :btc)
 
@@ -102,7 +103,7 @@ test "bip32_vectors_1_btc" do
      |> KeyPair.format_key()
      assert "xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76"
      = master_key |> KeyPair.derive("m/0'/1/2'/2/1000000000") |> KeyPair.format_key()
-   end
+  end
 
   test "bip32_vectors_2_btc" do
     seed = "fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542"
@@ -171,7 +172,6 @@ test "bip32_vectors_1_btc" do
       fn ->
         KeyPair.derive(public_master_key, "M/100'")
       end)
-
   end
 
   test "public_derivation" do
