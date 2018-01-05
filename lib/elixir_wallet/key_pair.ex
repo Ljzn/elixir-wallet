@@ -210,31 +210,11 @@ defmodule KeyPair do
     pub_with_netbytes <> checksum |> Base58Check.encode58()
   end
 
-  def compress(point) do
-    first_half =
-      point
-      |> Base.encode16()
-      |> String.slice(2, 128)
-      |> String.slice(0, 64)
-
-    second_half =
-      point
-      |> Base.encode16()
-      |> String.slice(2, 128)
-      |> String.slice(64, 64)
-
-    {last_digit_int, _} =
-      second_half
-      |> String.slice(63, 63)
-      |> Integer.parse(16)
-
-    compressed_key =
-      case rem(last_digit_int, 2) do
-        0 ->
-          "02" <> first_half
-        _ ->
-          "03" <> first_half
-      end
-    Base.decode16!(compressed_key)
+  defp compress(<<_prefix::size(8), x_coordinate::size(256), y_coordinate::size(256)>>) do
+    prefix = case rem(y_coordinate, 2) do
+      0 -> 0x02
+      _ -> 0x03
+    end
+    <<prefix::size(8), x_coordinate::size(256)>>
   end
 end
