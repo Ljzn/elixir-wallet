@@ -7,9 +7,6 @@ The mnemonic phrase is created following the [BIP-0039](https://github.com/bitco
 indexes = GenerateIndexes.generate_indexes()
 Mnemonic.generate_phrase(indexes)
 ```
-<img src="https://raw.githubusercontent.com/bitcoinbook/bitcoinbook/second_edition/images/mbc2_0506.png" width="400" height="400"/>
-
-Further info in the [bitcoinbook](https://github.com/bitcoinbook/bitcoinbook/blob/second_edition/ch05.asciidoc#mnemonic-code-words-bip-39)
 
 
 ## Encrypting the mnemonic
@@ -33,91 +30,99 @@ Cypher.decrypt(encrypted, "pass")
 ## From Mnemonic to seed
 
 
-First we create a seed from the already generated mnemonic phrase
-
+To create a seed from an already generated mnemonic phrase use the following function. 
 ```elixir
-seed = SeedGenerator.generate(mnemonic, pass_phrase, opts)
+seed = KeyPair.generate_seed(mnemonic)
 ```
+If a passphrase is not present, an empty string "" is used instead.
 
-A user may decide to protect their mnemonic with a passphrase. If a passphrase is not present, an empty string "" is used instead.
-
-To create a binary seed from the mnemonic, we use the PBKDF2 function with a mnemonic sentence (in UTF-8 NFKD) used as the password and the string 		"mnemonic" + passphrase (again in UTF-8 NFKD) used as the salt. The iteration count is set to 2048 and HMAC-SHA512 is used as the pseudo-random 	function. The length of the derived key is 512 bits (= 64 bytes).
-
-This seed is later used to generate deterministic wallets using [BIP-0032](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
-
-Further info in the [bitcoinbook](https://github.com/bitcoinbook/bitcoinbook/blob/second_edition/ch05.asciidoc#from-mnemonic-to-seed)
+But an user may decide to protect their mnemonic with a passphrase, to do so add the passphrase as the next parameter
+```elixir
+seed = KeyPair.generate_seed(mnemonic, pass_phrase)
+```
 
 
 ## Creating HD Wallet from the Seed
 Following the [BIP-0032](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki)
 
 
-HD wallets are created from a single root seed, which is a 128-, 256-, or 512-bit random number. Most commonly, this seed is generated from a mnemonic as detailed in the previous section.
+HD wallets are created from a single root seed, which is a 128bit random number. Most commonly, this seed is generated from a mnemonic as detailed in the previous section.
 
 Every key in the HD wallet is deterministically derived from this root seed, which makes it possible to re-create the entire HD wallet from that seed in any compatible HD wallet. This makes it easy to back up, restore, export, and import HD wallets containing thousands or even millions of keys by simply transferring only the mnemonic that the root seed is derived from.
 
-Further info in the [bitcoinbook](https://github.com/bitcoinbook/bitcoinbook/blob/second_edition/ch05.asciidoc#creating-an-hd-wallet-from-the-seed)
 
+### Creating extended 'master' Private key from a root seed
 
-### Creating master private key and chain code from a root seed
-
-
-Generate a seed byte sequence S of a chosen length (between 128 and 512 bits; 256 bits is advised) from a (P)RNG.
-Calculate I = HMAC-SHA512(Key = "Bitcoin seed", Data = S)
-Split I into two 32-byte sequences, IL and IR.
-Use parse256(IL) as master secret key, and IR as master chain code.
-
-In case IL is 0 or ≥ n, the master key is invalid (where 'n' is Integers modulo the order of the curve)
-
-n = FFFFFFFF FFFFFFFF FFFFFFFF FFFFFFFE BAAEDCE6 AF48A03B BFD25E8C D0364141) check the [Secp256k1](https://en.bitcoin.it/wiki/Secp256k1)
-
-The private key is generated using the crypto module from [erlang crypto module](http://erlang.org/doc/man/crypto.html#hmac-3)
-```erlang
-:crypto.hmac(Type, Key, Data) -> Mac
-```
-
-* As Type we use :sha512
-* As Key we use "Bitcoin seed"
-* As Data we use the seed
-
-To generate the Master Private key use the following function:
+After we have generated our seed we can use to generate the Master Private key use the following function:
 ```elixir
-master_private_key = KeyPair.generate_master_private_key(seed)
+master_private_key = KeyPair.generate_master_key(seed, :seed)
 ```
-
-
-### Creating master Public key
-
-
-The public key is generated using the crypto module from [erlang crypto module](http://erlang.org/doc/man/crypto.html#generate_key-2)
-```erlang
-:crypto.generate_key(Type, Params, PrivKeyIn) -> {PublicKey, PrivKeyOut}
-```
-
-* As Type we use :ecdh
-* As Params we use :secp256k1
-* As PrivKeyIn we use the decimal value of the Master Private key
-
-To generate the Master Public key we use the following function:
+This function will generate a Bitcoin private key. If we want to make an Aeternity key we add the `:ae` atom at the end:
 ```elixir
-master_public_key = KeyPair.generate_master_public_key(master_private_key)
+master_priv_key = KeyPair.generate_master_key(seed, :seed, :ae)
 ```
 
-Further info in the [bitcoinbook](https://github.com/bitcoinbook/bitcoinbook/blob/second_edition/ch04.asciidoc#public-keys)
+
+### Creating extended Public key
+
+After we have generated the extended private key we can convert it to public key using the following function:
+```elixir
+extended_pub_key = KeyPair.generate_pub_key(extended_private_key)
+```
+
+If the private key has an Aeternity prefix, an Aeternity public key shall be created, otherwise a Bitcoin public key. 
 
 
 ### Creating the Address
 
 
-Shows how to convert Public key into Address
+Having already the Public key generated, we can derive the address as follows
+```elixir
+address = KeyPair.generate_wallet_address(pub_key)
+```
 
-<img src="https://en.bitcoin.it/w/images/en/9/9b/PubKeyToAddr.png" width="400" height="500"/>
+### Deriving a child key
 
-Further in the [bitcoinwiki](https://en.bitcoin.it/wiki/Technical_background_of_version_1_Bitcoin_addresses) and in the [bitcoinbook](https://github.com/bitcoinbook/bitcoinbook/blob/second_edition/ch04.asciidoc#bitcoin-addresses)
+Once we have the master extended keys we can use them to derive children using the following functions:
+
+If we want to derive child private key we will use lowercase `m` in the path
+```elixir
+KeyPair.derive(extended_priv_key, "m/0'")
+```
+
+If we want to derive child public key we will use uppercase `M` in the path
+```elixir
+KeyPair.derive(extended_priv_key, "M/0'")
+```
+
+To derive hardned key use an apostrophe `'` sign after the number and a slash `/` to go deeper in the hierarchy
+
+
+### Aeternity key and address formatting
+
+For deriving a Private key the following prefix values should be used:
+`mainnet = 0x9E850AC9`
+`testnet = 0x9E850AC9`
+
+For deriving a Public key the following prefix values should be used:
+`mainnet = 0x9E86B78E`
+`testnet = 0xF350DAF8`
+
+For the address use the following Network bytes:
+`mainnet = 0x18`
+`testnet = 0x42`
+
+
 
 
 ## Installation
 
+Make sure you have installed the following packages to make sure that the dependency `libsecp256k1` will work properly:
+```bash
+sudo apt-get install autoconf autogen
+sudo apt-get install libtool
+sudo apt-get install libgmp3-dev
+```
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed
 by adding `elixir_wallet` to your list of dependencies in `mix.exs`:
