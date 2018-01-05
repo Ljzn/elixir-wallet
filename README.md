@@ -53,14 +53,15 @@ Every key in the HD wallet is deterministically derived from this root seed, whi
 
 ### Creating extended 'master' Private key from a root seed
 
-After we have generated our seed we can use to generate the Master Private key use the following function:
+After we have generated our seed we can use to generate the Master Private key use the following function
+
 ```elixir
-master_private_key = KeyPair.generate_master_key(seed, :seed)
+master_priv_key = KeyPair.generate_master_key(seed, currency)
 ```
-This function will generate a Bitcoin private key. If we want to make an Aeternity key we add the `:ae` atom at the end:
-```elixir
-master_priv_key = KeyPair.generate_master_key(seed, :seed, :ae)
-```
+
+For the currency you could use the following atoms:
+Bitcoin keys - `:btc`
+Aeternity keys - `:ae`
 
 
 ### Creating extended Public key

@@ -1,4 +1,4 @@
-defmodule GenerateIndexes do
+defmodule ElixirWallet.GenerateIndexes do
   @moduledoc """
   Module for generating indexes used by the Mnemnonic module
   to generate a phrase from the wordlist
@@ -30,6 +30,8 @@ defmodule GenerateIndexes do
       |  224  |  7 |   231  |  21  |
       |  256  |  8 |   264  |  24  |
   """
+
+  alias ElixirWallet.Bits, as: Bits
 
   ## 128 bits in bytes
   @entropy_byte_size 16
@@ -95,7 +97,8 @@ defmodule GenerateIndexes do
     checksum_length = trunc(entropy_bit_size / 32)
 
     ## Take the first 4 bits
-    :crypto.hash(:sha256, entropy)
+    :sha256
+    |> :crypto.hash(entropy)
     |> Bits.to_binary_list()
     |> Enum.join()
     |> String.slice(0..(checksum_length - 1))
