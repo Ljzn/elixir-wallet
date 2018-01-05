@@ -45,7 +45,7 @@ defmodule ElixirWallet.KeyPair do
      build_master_key(:crypto.hmac(:sha512, @aeternity_key, seed_bin), :ae)
   end
   def generate_master_key(_, currency) do
-     IO.warn("The cryptocurrency #{currency} is not supported! Check the doc for more info.")
+     throw("The cryptocurrency '#{currency}' is not supported! Check the doc for more info.")
   end
 
   defp build_master_key(<<priv_key::binary-32, chain_code::binary>>, currency) do
