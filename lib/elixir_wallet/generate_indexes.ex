@@ -95,7 +95,8 @@ defmodule GenerateIndexes do
     checksum_length = trunc(entropy_bit_size / 32)
 
     ## Take the first 4 bits
-    :crypto.hash(:sha256, entropy)
+    :sha256
+    |> :crypto.hash(entropy)
     |> Bits.to_binary_list()
     |> Enum.join()
     |> String.slice(0..(checksum_length - 1))

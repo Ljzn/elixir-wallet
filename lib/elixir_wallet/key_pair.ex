@@ -16,8 +16,11 @@ defmodule KeyPair do
   # Used as guard for the key derivation type: normal / hardned
   @mersenne_prime 2_147_483_647
 
-  def generate_seed(mnemonic, pass_phrase \\ "", opts \\ []) do
-    SeedGenerator.generate(mnemonic, pass_phrase, opts)
+  @doc """
+  Generates a seed from the given mnemonic and pass_phrase
+  """
+  def generate_seed(mnemonic, pass_phrase \\ "") do
+    SeedGenerator.generate(mnemonic, pass_phrase, [])
   end
 
   @doc """
@@ -44,13 +47,19 @@ defmodule KeyPair do
      IO.warn("The cryptocurrency #{currency} is not supported! Check the doc for more info.")
   end
 
-  defp build_master_key(<<priv_key::binary-32, c_code::binary>>, currency) do
+  defp build_master_key(<<priv_key::binary-32, chain_code::binary>>, currency) do
     key = PrivKey.create(:mainnet, currency)
-    %{key | key: priv_key, chain_code: c_code}
+    %{key | key: priv_key, chain_code: chain_code}
   end
 
+  @doc """
+  Generates the corresponding Public key to the given Private key
+  ## Example
+      iex> KeyPair.to_public_key(%Privkey{})
+      %PubKey{}
+  """
   def to_public_key(%PrivKey{} = priv_key) do
-    pub_key = KeyPair.generate_pub_key(priv_key)
+    pub_key = generate_pub_key(priv_key)
     key = PubKey.create(:mainnet, priv_key.currency)
     %{key |
       depth: priv_key.depth,
@@ -60,41 +69,32 @@ defmodule KeyPair do
       key: pub_key}
   end
 
-  def generate_pub_key(%PrivKey{key: priv_key}) do
+  defp generate_pub_key(%PrivKey{key: priv_key}) do
     {pub_key, _rest} = :crypto.generate_key(:ecdh, :secp256k1, priv_key)
     pub_key
   end
-  def generate_pub_key(%PrivKey{} = key, :compressed) do
+  defp generate_pub_key(%PrivKey{} = key, :compressed) do
     key
-    |> KeyPair.generate_pub_key()
+    |> generate_pub_key()
     |> compress()
   end
 
-  def fingerprint(%PrivKey{} = key) do
+  defp fingerprint(%PrivKey{} = key) do
     key
-    |> KeyPair.generate_pub_key(:compressed)
-    |> KeyPair.fingerprint()
+    |> generate_pub_key(:compressed)
+    |> fingerprint()
   end
-  def fingerprint(%PubKey{key: pub_key}) do
+  defp fingerprint(%PubKey{key: pub_key}) do
     pub_key
     |> compress()
-    |> KeyPair.fingerprint()
+    |> fingerprint()
   end
-  def fingerprint(pub_key) do
+  defp fingerprint(pub_key) do
     <<f_print::binary-4, _rest::binary>> =
       :crypto.hash(:ripemd160, :crypto.hash(:sha256, pub_key))
     f_print
   end
 
-  defp serialize(%PubKey{} = key) do
-    compressed_pub_key = KeyPair.compress(key.key)
-    {<<key.version::size(32)>>,
-     <<key.depth::size(8),
-     key.f_print::binary-4,
-     key.child_num::size(32),
-     key.chain_code::binary,
-     compressed_pub_key::binary>>}
-  end
   defp serialize(%PrivKey{} = key) do
     {<<key.version::size(32)>>,
      <<key.depth::size(8),
@@ -103,7 +103,21 @@ defmodule KeyPair do
      key.chain_code::binary,
      <<0::size(8)>>, key.key::binary>>}
   end
+  defp serialize(%PubKey{} = key) do
+    {<<key.version::size(32)>>,
+     <<key.depth::size(8),
+     key.f_print::binary-4,
+     key.child_num::size(32),
+     key.chain_code::binary,
+     compress(key.key)::binary>>}
+  end
 
+  @doc """
+  Formats the key into Base58
+  ## Example
+      iex> KeyPair.format_key(key)
+      "xprv9ykQk99RM1ihJkrSMmfn28SEZiF79geaDvMHGJz6b2zmSvzdmWmru2ScVujbbkJ9kVUrVNNhER5373sZSUcfJYhNSGyg64VB9jm5aP9oAga"
+  """
   def format_key(key) when is_map(key) do
     {prefix, bip32_serialization} = serialize(key)
     Base58Check.encode58check(prefix, bip32_serialization)
@@ -147,7 +161,7 @@ defmodule KeyPair do
   def derive_key(%PrivKey{} = key, index) when index > -1 and index <= @mersenne_prime do
     # Normal derivation
     compressed_pub_key =
-        KeyPair.generate_pub_key(key, :compressed)
+        generate_pub_key(key, :compressed)
 
     <<derived_key::size(256), child_chain::binary>> =
       :crypto.hmac(:sha512, key.chain_code,
@@ -179,6 +193,7 @@ defmodule KeyPair do
       :crypto.hmac(:sha512, key.chain_code,
         <<serialized_pub_key::binary, index::size(32)>>)
 
+    # Elliptic curve point addition
     {:ok, child_key} = :libsecp256k1.ec_pubkey_tweak_add(key.key, derived_key)
 
     KeyPair.derive_key(key, child_key, child_chain, index)
@@ -194,7 +209,7 @@ defmodule KeyPair do
       key: child_key,
       chain_code: child_chain,
       depth: key.depth + 1,
-      f_print: KeyPair.fingerprint(key),
+      f_print: fingerprint(key),
       child_num: index}
   end
 
@@ -225,7 +240,7 @@ defmodule KeyPair do
     <<checksum::binary-4, _rest::binary>> = :crypto.hash(:sha256,
       :crypto.hash(:sha256, pub_with_netbytes))
 
-    pub_with_netbytes <> checksum |> Base58Check.encode58()
+    Base58Check.encode58(pub_with_netbytes <> checksum)
   end
 
   defp compress(<<_prefix::size(8), x_coordinate::size(256), y_coordinate::size(256)>>) do

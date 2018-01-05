@@ -105,7 +105,8 @@ defmodule Wallet do
     case load_wallet_file(file_path, password, pass_phrase) do
       {:ok, mnemonic} ->
         master_key =
-          KeyPair.generate_seed(mnemonic, pass_phrase)
+          mnemonic
+          |> KeyPair.generate_seed(pass_phrase)
           |> KeyPair.generate_master_key(:btc)
         public_key = KeyPair.to_public_key(master_key)
         {:ok, public_key.key}
@@ -143,7 +144,8 @@ defmodule Wallet do
     case load_wallet_file(file_path, password, pass_phrase) do
       {:ok, mnemonic} ->
         private_key =
-          KeyPair.generate_seed(mnemonic, pass_phrase)
+          mnemonic
+          |> KeyPair.generate_seed(pass_phrase)
           |> KeyPair.generate_master_key(:btc)
         {:ok, private_key.key}
       {:error, message} -> {:error, message}
