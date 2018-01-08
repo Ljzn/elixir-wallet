@@ -8,6 +8,8 @@ defmodule Aewallet.Wallet do
 
   alias Aewallet.KeyPair, as: KeyPair
   alias Aewallet.Cypher, as: Cypher
+  alias Aewallet.Mnemonic, as: Mnemonic
+  alias Aewallet.GenerateIndexes, as: GenerateIndexes
 
   @doc """
   Creates a wallet file
