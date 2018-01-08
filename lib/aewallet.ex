@@ -1,4 +1,4 @@
-defmodule ElixirWallet do
+defmodule Aewallet do
   @moduledoc """
   Elixir Wallet
   """

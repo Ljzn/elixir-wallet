@@ -1,4 +1,4 @@
-defmodule ElixirWallet.Signing do
+defmodule Aewallet.Signing do
 
   @moduledoc """
   Module for signing and verifying transactions using the ECDSA algorithm

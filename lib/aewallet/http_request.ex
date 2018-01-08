@@ -1,4 +1,4 @@
-defmodule ElixirWallet.HttpRequest do
+defmodule Aewallet.HttpRequest do
   @moduledoc """
   Holds the HttpRequest functions
   """

@@ -1,11 +1,11 @@
-defmodule ElixirWallet.KeyPair do
+defmodule Aewallet.KeyPair do
   @moduledoc """
   Module for generating master public and private key
   """
 
-  alias ElixirWallet.KeyPair, as: KeyPair
-  alias ElixirWallet.Structs.Bip32PubKey, as: PubKey
-  alias ElixirWallet.Structs.Bip32PrivKey, as: PrivKey
+  alias Aewallet.KeyPair, as: KeyPair
+  alias Aewallet.Structs.Bip32PubKey, as: PubKey
+  alias Aewallet.Structs.Bip32PrivKey, as: PrivKey
 
   # Constant for generating the private_key / chain_code
   @bitcoin_key "Bitcoin seed"
