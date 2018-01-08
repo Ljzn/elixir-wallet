@@ -1,7 +1,7 @@
 defmodule Bip32DerivationTest do
   use ExUnit.Case
 
-  alias ElixirWallet.KeyPair, as: KeyPair
+  alias Aewallet.KeyPair, as: KeyPair
 
   test "bip32_vectors_1_aeternity" do
     seed = "000102030405060708090a0b0c0d0e0f" |> Base.decode16!(case: :mixed)

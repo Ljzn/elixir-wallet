@@ -1,8 +1,8 @@
 defmodule SigningAndVerifyingTest do
   use ExUnit.Case
-  doctest ElixirWallet
+  doctest Aewallet
 
-  alias ElixirWallet.Signing, as: Signing
+  alias Aewallet.Signing, as: Signing
 
   test "validate signing and verifying transaction 1" do
     message = <<0,1>>
