@@ -1,4 +1,4 @@
-defmodule ElixirWallet.Wallet do
+defmodule Aewallet.Wallet do
   require Logger
 
   @moduledoc """
@@ -6,8 +6,8 @@ defmodule ElixirWallet.Wallet do
   WalletCrypto.decrypt_wallet("wallet_file_name", "password", "mnemonic_phrase")
   """
 
-  alias ElixirWallet.KeyPair, as: KeyPair
-  alias ElixirWallet.Cypher, as: Cypher
+  alias Aewallet.KeyPair, as: KeyPair
+  alias Aewallet.Cypher, as: Cypher
 
   @doc """
   Creates a wallet file

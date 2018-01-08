@@ -1,8 +1,8 @@
 defmodule PublicKeyAndAddressTest do
   use ExUnit.Case
-  doctest ElixirWallet
+  doctest Aewallet
 
-  alias ElixirWallet.KeyPair, as: KeyPair
+  alias Aewallet.KeyPair, as: KeyPair
 
   test "validate master public key and address 1" do
     seed =

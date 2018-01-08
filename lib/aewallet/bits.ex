@@ -1,4 +1,4 @@
-defmodule ElixirWallet.Bits do
+defmodule Aewallet.Bits do
   @moduledoc """
   Module for converting a bitstring to a list of bits
   """

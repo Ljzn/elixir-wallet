@@ -1,8 +1,8 @@
 defmodule LoadPublicKeyAndAddressTest do
   use ExUnit.Case
-  doctest ElixirWallet
+  doctest Aewallet
 
-  alias ElixirWallet.Wallet, as: Wallet
+  alias Aewallet.Wallet, as: Wallet
 
   test "validate master public key and address 1" do
     mnemonic = Wallet.load_wallet_file("test/test_wallets/wallet--2017-11-1-16-35-48", "password")
