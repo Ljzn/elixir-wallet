@@ -21,15 +21,15 @@ defmodule Aewallet.Wallet do
       whisper edit clump violin blame few ancient casual
       sand trip update spring
   """
-  @spec create_wallet(String.t(), String.t()) :: String.t()
-  def create_wallet(password, pass_phrase \\ "") do
+  @spec create_wallet(String.t(), String.t(), String.t()) :: String.t()
+  def create_wallet(password, pass_phrase \\ "", path \\ "") do
     mnemonic_phrase = Mnemonic.generate_phrase(GenerateIndexes.generate_indexes)
 
     if pass_phrase != "" do
-      mnemonic_phrase_with_pass_phrase = mnemonic_phrase <> " " <> pass_phrase
-      save_wallet_file(mnemonic_phrase_with_pass_phrase, password)
+      mnemonic_and_pass_phrase = mnemonic_phrase <> " " <> pass_phrase
+      save_wallet_file(mnemonic_and_pass_phrase, password, path)
     else
-      save_wallet_file(mnemonic_phrase, password)
+      save_wallet_file(mnemonic_phrase, password, path)
     end
 
     Logger.info("Your wallet was created.")
@@ -41,13 +41,13 @@ defmodule Aewallet.Wallet do
   Creates a wallet file from an existing mnemonic_phrase and password
   If the wallet was not password protected, just pass the mnemonic_phrase
   """
-  @spec import_wallet(String.t(), String.t(), String.t()) :: String.t()
-  def import_wallet(mnemonic_phrase, password, pass_phrase \\ "") do
+  @spec import_wallet(String.t(), String.t(), String.t(), String.t()) :: String.t()
+  def import_wallet(mnemonic_phrase, password, pass_phrase \\ "", path \\ "") do
     if pass_phrase != "" do
       mnemonic_phrase_with_pass_phrase = mnemonic_phrase <> " " <> pass_phrase
-      save_wallet_file(mnemonic_phrase_with_pass_phrase, password)
+      save_wallet_file(mnemonic_phrase_with_pass_phrase, password, path)
     else
-      save_wallet_file(mnemonic_phrase, password)
+      save_wallet_file(mnemonic_phrase, password, path)
     end
     Logger.info("You have successfully imported a wallet")
   end
@@ -157,13 +157,21 @@ defmodule Aewallet.Wallet do
     end
   end
 
-  defp save_wallet_file(mnemonic_phrase, password) do
+  defp save_wallet_file(mnemonic_phrase, password, path) do
     {{year, month, day}, {hours, minutes, seconds}} = :calendar.local_time()
     file_name = "wallet--#{year}-#{month}-#{day}-#{hours}-#{minutes}-#{seconds}"
-    {:ok, file} = File.open(file_name, [:write])
+    file_path =
+      path
+      |> Path.join(file_name)
+      |> File.open([:write])
 
-    encrypted = Cypher.encrypt(mnemonic_phrase, password)
-    IO.binwrite(file, encrypted)
-    File.close(file)
+    case file_path do
+      {:ok, file} ->
+        encrypted = Cypher.encrypt(mnemonic_phrase, password)
+        IO.binwrite(file, encrypted)
+        File.close(file)
+      {:error, message} ->
+        throw("The path you have given has thrown an #{message} error!")
+    end
   end
 end
