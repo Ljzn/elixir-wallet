@@ -16,7 +16,7 @@ defmodule Aewallet.Mixfile do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger, :httpoison, :poison]
+      extra_applications: [:logger]
     ]
   end
 
@@ -27,7 +27,6 @@ defmodule Aewallet.Mixfile do
       {:seed_generator, github: "quanterall/seed_generator"},
       {:httpoison, "~> 0.13.0"},
       {:libsecp256k1, [github: "mbrix/libsecp256k1", manager: :rebar]},
-      {:poison, "~> 3.1"},
       {:excoveralls, "~> 0.7", only: :test},
       {:credo, "~> 0.8", only: [:dev, :test], runtime: false}
     ]

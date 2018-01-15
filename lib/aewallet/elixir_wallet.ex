@@ -9,7 +9,12 @@ defmodule Aewallet.Wallet do
   alias Aewallet.KeyPair, as: KeyPair
   alias Aewallet.Cypher, as: Cypher
   alias Aewallet.Mnemonic, as: Mnemonic
-  alias Aewallet.GenerateIndexes, as: GenerateIndexes
+  alias Aewallet.GenerateIndexes, as: Indexes
+
+  @type key :: atom
+  @type value :: any
+
+  @type opts :: [{key, value}]
 
   @doc """
   Creates a wallet file
@@ -21,79 +26,22 @@ defmodule Aewallet.Wallet do
       whisper edit clump violin blame few ancient casual
       sand trip update spring
   """
-  @spec create_wallet(String.t(), String.t(), String.t()) :: String.t()
-  def create_wallet(password, pass_phrase \\ "", path \\ "") do
-    mnemonic_phrase = Mnemonic.generate_phrase(GenerateIndexes.generate_indexes)
-
-    if pass_phrase != "" do
-      mnemonic_and_pass_phrase = mnemonic_phrase <> " " <> pass_phrase
-      save_wallet_file(mnemonic_and_pass_phrase, password, path)
-    else
-      save_wallet_file(mnemonic_phrase, password, path)
-    end
-
-    Logger.info("Your wallet was created.")
-    Logger.info("Use the following phrase as additional authentication when accessing your wallet:")
-    Logger.info(mnemonic_phrase)
+  @spec create_wallet(String.t(), String.t(), String.t(), opts) :: String.t()
+  def create_wallet(password, path,  pass_phrase \\ "", opts \\ []) do
+    mnemonic = generate_mnemonic()
+    case = get_key(opts, :type, :ae)
+    build_wallet(mnemonic, password, pass_phrase, path, case)
   end
 
   @doc """
   Creates a wallet file from an existing mnemonic_phrase and password
   If the wallet was not password protected, just pass the mnemonic_phrase
   """
-  @spec import_wallet(String.t(), String.t(), String.t(), String.t()) :: String.t()
-  def import_wallet(mnemonic_phrase, password, pass_phrase \\ "", path \\ "") do
-    if pass_phrase != "" do
-      mnemonic_phrase_with_pass_phrase = mnemonic_phrase <> " " <> pass_phrase
-      save_wallet_file(mnemonic_phrase_with_pass_phrase, password, path)
-    else
-      save_wallet_file(mnemonic_phrase, password, path)
-    end
-    Logger.info("You have successfully imported a wallet")
-  end
-
-  @doc """
-  Decrypts a file and displays it's mnemonic phrase
-  Will only return a mnemonic phrase if the password is correct
-  """
-  @spec load_wallet(String.t(), String.t(), String.t()) :: Tuple.t()
-  def load_wallet_file(file_path, password, pass_phrase \\ "") do
-    load_wallet(File.read(file_path), password, pass_phrase)
-  end
-  def load_wallet({:ok, encrypted_data}, password, pass_phrase) do
-    mnemonic = Cypher.decrypt(encrypted_data, password)
-        if String.valid? mnemonic do
-          mnemonic_list = String.split(mnemonic)
-          pass_phrase_check = Enum.at(mnemonic_list, 12)
-          case pass_phrase_check do
-            :nil ->
-              {:ok , mnemonic}
-            result when result == pass_phrase ->
-              mnemonic = String.replace(mnemonic, " " <> pass_phrase, "")
-              {:ok, mnemonic}
-            _ ->
-              Logger.error("Invalid pass phrase")
-              {:error, "Invalid pass phrase"}
-          end
-        else
-          Logger.error("Invalid password")
-          {:error, "Invalid password"}
-        end
-  end
-  def load_wallet({:error, reason}, _password, _pass_phrase) do
-    case reason do
-      :enoent ->
-        {:error, "The file does not exist."}
-      :eaccess ->
-        {:error, "Missing permision for reading the file,
-        or for searching one of the parent directories."}
-      :eisdir ->
-        {:error, "The named file is a directory."}
-      :enotdir ->
-        {:error, "A component of the file name is not a directory."}
-      :enomem ->
-        {:error, "There is not enough memory for the contents of the file."}
-    end
+  @spec import_wallet(String.t(), String.t(), String.t(), opts) :: String.t()
+  def import_wallet(mnemonic_phrase, password, path, pass_phrase \\ "", opts \\ []) do
+    wallet_data = mnemonic_phrase <> " " <> pass_phrase
+    wallet_type = get_key(opts, :type, :ae)
+    build_wallet(wallet_data, password, pass_phrase, path, wallet_type)
   end
 
   @doc """
@@ -105,10 +53,17 @@ defmodule Aewallet.Wallet do
       168, 175, 243, 132, 39, 71, 208, 94, 138, 190, 242, 78, 74, 141, 43, 58, 241,
       15, 19, 179, 45, 42, 79, 118, 24, 160, 20, 64, 178, 109, 124, 172, 127, ...>>}
   """
-  @spec get_public_key(String.t(), String.t(), String.t()) :: Tuple.t()
-  def get_public_key(file_path, password, pass_phrase \\ "") do
-    case load_wallet_file(file_path, password, pass_phrase) do
+  @spec get_public_key(String.t(), String.t()) :: Tuple.t()
+  def get_public_key(file_path, password) do
+    case load_wallet_file(file_path, password) do
       {:ok, mnemonic} ->
+        master_key =
+          mnemonic
+          |> KeyPair.generate_seed()
+          |> KeyPair.generate_master_key(:btc)
+        public_key = KeyPair.to_public_key(master_key)
+        {:ok, public_key.key}
+      {:ok, mnemonic, pass_phrase} ->
         master_key =
           mnemonic
           |> KeyPair.generate_seed(pass_phrase)
@@ -126,9 +81,9 @@ defmodule Aewallet.Wallet do
       iex> Wallet.get_address("wallet--2017-10-31-14-54-39", "password")
       {:ok, "1NM51tw1MixFCe64g6ExhCEXnowEGrQ2DE"}
   """
-  @spec get_address(String.t(), String.t(), String.t()) :: Tuple.t()
-  def get_address(file_path, password, pass_phrase \\ "") do
-    case get_public_key(file_path, password, pass_phrase) do
+  @spec get_address(String.t(), String.t()) :: Tuple.t()
+  def get_address(file_path, password) do
+    case get_public_key(file_path, password) do
       {:ok, pub_key} ->
         address = KeyPair.generate_wallet_address(pub_key, :btc)
         {:ok, address}
@@ -144,17 +99,36 @@ defmodule Aewallet.Wallet do
       {:ok, <<100, 208, 92, 132, 43, 104, 6, 55, 125, 18, 18, 215, 98, 8, 245, 12, 78, 92,
       89, 115, 59, 231, 28, 142, 137, 119, 62, 19, 102, 238, 171, 185>>}
   """
-  @spec get_private_key(String.t(), String.t(), String.t()) :: Tuple.t()
-  def get_private_key(file_path, password, pass_phrase \\ "") do
-    case load_wallet_file(file_path, password, pass_phrase) do
+  @spec get_private_key(String.t(), String.t()) :: Tuple.t()
+  def get_private_key(file_path, password) do
+    case load_wallet_file(file_path, password) do
       {:ok, mnemonic} ->
         private_key =
           mnemonic
-          |> KeyPair.generate_seed(pass_phrase)
+          |> KeyPair.generate_seed()
           |> KeyPair.generate_master_key(:btc)
         {:ok, private_key.key}
       {:error, message} -> {:error, message}
     end
+  end
+
+  ## Private functions
+
+  wallet_types = [ae: :ae, btc: :btc]
+
+  for {case, fun} <- wallet_types do
+    defp build_wallet(mnemonic, password, pass_phrase, path, unquote(case)) do
+      wallet_data = Atom.to_string(unquote(fun)) <> " " <> mnemonic <> " " <> pass_phrase
+      save_wallet_file(wallet_data, password, path)
+      log_info(mnemonic)
+    end
+  end
+
+  defp log_info(mnemonic_phrase) do
+    Logger.info("Your wallet was created.")
+    Logger.info("Use the following phrase as additional authentication when accessing your wallet:")
+    Logger.info(mnemonic_phrase)
+    :ok
   end
 
   defp save_wallet_file(mnemonic_phrase, password, path) do
@@ -172,6 +146,56 @@ defmodule Aewallet.Wallet do
         File.close(file)
       {:error, message} ->
         throw("The path you have given has thrown an #{message} error!")
+    end
+  end
+
+  @spec load_wallet(String.t(), String.t(), String.t()) :: Tuple.t()
+  defp load_wallet_file(file_path, password) do
+    load_wallet(File.read(file_path), password)
+  end
+  defp load_wallet({:ok, encrypted_data}, password) do
+    mnemonic = Cypher.decrypt(encrypted_data, password)
+    if String.valid? mnemonic do
+      mnemonic_list = String.split(mnemonic)
+      pass_phrase_check = Enum.at(mnemonic_list, 12)
+      case pass_phrase_check do
+        :nil ->
+          {:ok, mnemonic}
+        pass_phrase ->
+          mnemonic = String.replace(mnemonic, " " <> pass_phrase, "")
+          {:ok, mnemonic, pass_phrase}
+        _ ->
+          Logger.error("Invalid pass phrase")
+          {:error, "Invalid pass phrase"}
+      end
+    else
+      Logger.error("Invalid password")
+      {:error, "Invalid password"}
+    end
+  end
+  def load_wallet({:error, reason}, _password, _pass_phrase) do
+    case reason do
+      :enoent ->
+        {:error, "The file does not exist."}
+      :eaccess ->
+        {:error, "Missing permision for reading the file,
+        or for searching one of the parent directories."}
+      :eisdir ->
+        {:error, "The named file is a directory."}
+      :enotdir ->
+        {:error, "A component of the file name is not a directory."}
+      :enomem ->
+        {:error, "There is not enough memory for the contents of the file."}
+    end
+  end
+
+  defp generate_mnemonic(), do: Mnemonic.generate_phrase(Indexes.generate_indexes)
+
+  @spec get_key(opts, key, value) :: value
+  def get_key(keywords, key, default \\ nil) when is_list(keywords) and is_atom(key) do
+    case :lists.keyfind(key, 1, keywords) do
+      {^key, value} -> value
+      false -> default
     end
   end
 end
