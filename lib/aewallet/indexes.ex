@@ -1,4 +1,4 @@
-defmodule Aewallet.GenerateIndexes do
+defmodule Aewallet.Indexes do
   @moduledoc """
   Module for generating indexes used by the Mnemnonic module
   to generate a phrase from the wordlist
@@ -39,7 +39,7 @@ defmodule Aewallet.GenerateIndexes do
   @doc """
   Generates random numbers(indexes) using entropy for guaranteed randomness
   ## Examples
-      iex> GenerateIndexes.generate_indexes()
+      iex> Indexes.generate_indexes()
       [674, 1135, 630, 1012, 624, 1428, 481, 1666, 693, 534, 1933, 628]
   """
   @spec generate_indexes :: List.t()
@@ -60,10 +60,10 @@ defmodule Aewallet.GenerateIndexes do
   a number from 0-2047, serving as an index into a wordlist.
   The result is a list of grups.
   ## Examples
-      iex> GenerateIndexes.split_bits_into_groups("1011100011010100110110")
+      iex> Indexes.split_bits_into_groups("1011100011010100110110")
       ["10100110110", "10111000110"]
 
-      iex> GenerateIndexes.split_bits_into_groups("1011100011010100110110" <> "1011001011")
+      iex> Indexes.split_bits_into_groups("1011100011010100110110" <> "1011001011")
       ["10100110110", "10111000110"]
   """
   @spec split_bits_into_groups(String.t()) :: List.t()
@@ -75,7 +75,7 @@ defmodule Aewallet.GenerateIndexes do
   Converts binary list (consisting of groups of 11 bits)
   to byte list (consisting of number from 0 to 2047)
   ## Examples
-      iex> GenerateIndexes.parse_binary_list(["10100110110", "10111000110"])
+      iex> Indexes.parse_binary_list(["10100110110", "10111000110"])
       [1478, 1334]
   """
   @spec parse_binary_list(List.t()) :: List.t()

@@ -21,7 +21,6 @@ defmodule Aewallet.Mnemonic do
   end
 
   defp get_wordlist do
-
     {:ok, word_list} =
       :code.priv_dir(:aewallet)
       |> Path.join("wordlist.txt")

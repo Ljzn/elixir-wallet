@@ -17,6 +17,11 @@ defmodule Aewallet.KeyPair do
   # Used as guard for the key derivation type: normal / hardned
   @mersenne_prime 2_147_483_647
 
+  @type key :: atom
+  @type value :: any
+
+  @type opts :: [{key, value}]
+
   @doc """
   Generates a seed from the given mnemonic and pass_phrase
   """
@@ -37,20 +42,18 @@ defmodule Aewallet.KeyPair do
      -  `:btc` - Creates a `Bitcoin` key
      -  `:ae`  - Creates an `Aeternity` key
   """
-  @spec generate_master_key(Binary.t(), currency::Atom.t()) :: extended_key::Map.t()
-  def generate_master_key(seed_bin, :btc) do
-     build_master_key(:crypto.hmac(:sha512, @bitcoin_key, seed_bin), :btc)
-  end
-  def generate_master_key(seed_bin, :ae) do
-     build_master_key(:crypto.hmac(:sha512, @aeternity_key, seed_bin), :ae)
-  end
-  def generate_master_key(_, currency) do
-     throw("The cryptocurrency '#{currency}' is not supported! Check the doc for more info.")
+  @spec generate_master_key(Binary.t(), opts) :: extended_key::Map.t()
+  def generate_master_key(seed_bin, network, opts \\ []) do
+    case = Keyword.get(opts, :type, :ae)
+    build_master_key(:crypto.hmac(:sha512, @bitcoin_key, seed_bin), network, case)
   end
 
-  defp build_master_key(<<priv_key::binary-32, chain_code::binary>>, currency) do
-    key = PrivKey.create(:mainnet, currency)
-    %{key | key: priv_key, chain_code: chain_code}
+  wallet_types = [ae: :ae, btc: :btc]
+  for {case, wallet_type} <- wallet_types do
+    defp build_master_key(<<priv_key::binary-32, c_code::binary>>, network, unquote(case)) do
+      key = PrivKey.create(network, unquote(wallet_type))
+      %{key | network: network, key: priv_key, chain_code: c_code}
+    end
   end
 
   @doc """
@@ -61,7 +64,7 @@ defmodule Aewallet.KeyPair do
   """
   def to_public_key(%PrivKey{} = priv_key) do
     pub_key = generate_pub_key(priv_key)
-    key = PubKey.create(:mainnet, priv_key.currency)
+    key = PubKey.create(priv_key.network, priv_key.currency)
     %{key |
       depth: priv_key.depth,
       f_print: priv_key.f_print,
@@ -225,16 +228,27 @@ defmodule Aewallet.KeyPair do
     -  mainnet = `0x18`
     -  testnet = `0x42`
   """
-  @spec generate_wallet_address(Binary.t(), tuple()) :: String.t()
-  def generate_wallet_address(public_key, :btc) do
-    generate_address(public_key)
+  main_networks = [ae: 0x18, btc: 0x00]
+  for {case, net_bytes} <- main_networks do
+    def generate_wallet_address(public_key, :mainnet, unquote(case)) do
+      generate_address(public_key, unquote(net_bytes))
+    end
   end
-  def generate_wallet_address(public_key, :ae) do
-    generate_address(public_key, 0x18)
+
+  test_networks = [ae: 0x42, btc: 0x6F]
+  for {case, net_bytes} <- test_networks do
+    def generate_wallet_address(public_key, :testnet, unquote(case)) do
+      generate_address(public_key, unquote(net_bytes))
+    end
   end
-  defp generate_address(public_key, net_bytes \\ 0x00) do
-    pub_ripemd160 = :crypto.hash(:ripemd160,
-      :crypto.hash(:sha256, public_key))
+
+  def generate_wallet_address(public_key, network, _wallet_type) do
+    throw("The #{network} network is not supported! Please use :mainnet or :testnet")
+  end
+
+  defp generate_address(public_key, net_bytes) do
+    pub_ripemd160 =
+      :crypto.hash(:ripemd160, :crypto.hash(:sha256, public_key))
 
     pub_with_netbytes = <<net_bytes::size(8), pub_ripemd160::binary>>
 
