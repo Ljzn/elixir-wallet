@@ -11,18 +11,25 @@ defmodule Aewallet.Mnemonic do
       iex> Mnemonic.generate_phrase([1223, 32, 453])
       "ocean advice december"
   """
+  @spec generate_phrase(list()) :: String.t()
   def generate_phrase(rows) do
-    phrase = ""
-    for row <- rows do
-      phrase <> elem(get_wordlist(), row) <> " "
+    phrase = for row <- rows do
+      elem(get_wordlist(), row) <> " "
     end
     |> List.to_string()
     |> String.trim()
   end
 
-  defp get_wordlist do
+  @doc """
+  Finds the directory of the priv folder in the :aewallet project
+  and reads the wordlist.txt file inside it.
+  Returns a tuple with all the words
+  """
+  @spec get_wordlist :: tuple()
+  def get_wordlist do
     {:ok, word_list} =
-      :code.priv_dir(:aewallet)
+      :aewallet
+      |> :code.priv_dir()
       |> Path.join("wordlist.txt")
       |> File.read()
 

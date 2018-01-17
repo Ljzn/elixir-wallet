@@ -33,7 +33,7 @@ defmodule Aewallet.Indexes do
 
   alias Aewallet.Bits, as: Bits
 
-  ## 128 bits in bytes
+  # 128 bits in bytes
   @entropy_byte_size 16
 
   @doc """
@@ -86,7 +86,7 @@ defmodule Aewallet.Indexes do
   end
   def binary_to_byte(binary), do: binary |> Integer.parse(2) |> elem(0)
 
-  ## Private functions
+  ## Private functions.
 
   defp generate_entropy(entropy_byte_size) do
     :crypto.strong_rand_bytes(entropy_byte_size)
@@ -96,7 +96,7 @@ defmodule Aewallet.Indexes do
     entropy_bit_size = entropy_byte_size * 8
     checksum_length = trunc(entropy_bit_size / 32)
 
-    ## Take the first 4 bits
+    # Take the first 4 bits of the entropy.
     :sha256
     |> :crypto.hash(entropy)
     |> Bits.to_binary_list()

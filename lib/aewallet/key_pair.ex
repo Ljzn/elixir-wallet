@@ -7,6 +7,31 @@ defmodule Aewallet.KeyPair do
   alias Aewallet.Structs.Bip32PubKey, as: PubKey
   alias Aewallet.Structs.Bip32PrivKey, as: PrivKey
 
+  @typedoc "Wallet option key"
+  @type key :: atom
+
+  @typedoc "Wallet option value"
+  @type value :: any
+
+  @typedoc "Keyword options list"
+  @type opts :: [{key, value}]
+
+  @typedoc "Pivate extended key struct"
+  @type privkey :: %PrivKey{}
+
+  @typedoc "Public extended key struct"
+  @type pubkey :: %PubKey{}
+
+  @typedoc "Structure of extended key"
+  @type t :: %{
+          version: binary,
+          depth: binary,
+          fingerprint: binary,
+          child_num: binary ,
+          chain_code: binary,
+          ser_key: binary
+        }
+
   # Constant for generating the private_key / chain_code
   @bitcoin_key "Bitcoin seed"
   @aeternity_key "Aeternity seed"
@@ -16,11 +41,6 @@ defmodule Aewallet.KeyPair do
 
   # Used as guard for the key derivation type: normal / hardned
   @mersenne_prime 2_147_483_647
-
-  @type key :: atom
-  @type value :: any
-
-  @type opts :: [{key, value}]
 
   @doc """
   Generates a seed from the given mnemonic and pass_phrase
@@ -42,15 +62,24 @@ defmodule Aewallet.KeyPair do
      -  `:btc` - Creates a `Bitcoin` key
      -  `:ae`  - Creates an `Aeternity` key
   """
-  @spec generate_master_key(Binary.t(), opts) :: extended_key::Map.t()
+  @spec generate_master_key(Binary.t(), opts()) :: privkey()
   def generate_master_key(seed_bin, network, opts \\ []) do
-    case = Keyword.get(opts, :type, :ae)
-    build_master_key(:crypto.hmac(:sha512, @bitcoin_key, seed_bin), network, case)
+    type = Keyword.get(opts, :type, :ae)
+    seed = case type do
+      :ae ->
+        :sha512
+        |> :crypto.hmac(@aeternity_key, seed_bin)
+
+      :btc ->
+        :sha512
+        |> :crypto.hmac(@bitcoin_key, seed_bin)
+    end
+    build_master_key(seed, network, type)
   end
 
   wallet_types = [ae: :ae, btc: :btc]
-  for {case, wallet_type} <- wallet_types do
-    defp build_master_key(<<priv_key::binary-32, c_code::binary>>, network, unquote(case)) do
+  for {type, wallet_type} <- wallet_types do
+    defp build_master_key(<<priv_key::binary-32, c_code::binary>>, network, unquote(type)) do
       key = PrivKey.create(network, unquote(wallet_type))
       %{key | network: network, key: priv_key, chain_code: c_code}
     end
@@ -62,6 +91,7 @@ defmodule Aewallet.KeyPair do
       iex> KeyPair.to_public_key(%Privkey{})
       %PubKey{}
   """
+  @spec to_public_key(privkey()) :: pubkey()
   def to_public_key(%PrivKey{} = priv_key) do
     pub_key = generate_pub_key(priv_key)
     key = PubKey.create(priv_key.network, priv_key.currency)
@@ -73,47 +103,62 @@ defmodule Aewallet.KeyPair do
       key: pub_key}
   end
 
+  @spec generate_pub_key(privkey()) :: binary()
   defp generate_pub_key(%PrivKey{key: priv_key}) do
     {pub_key, _rest} = :crypto.generate_key(:ecdh, :secp256k1, priv_key)
     pub_key
   end
+
+  @spec generate_pub_key(privkey(), atom()) :: binary()
   defp generate_pub_key(%PrivKey{} = key, :compressed) do
     key
     |> generate_pub_key()
     |> compress()
   end
 
+  @spec fingerprint(privkey()) :: binary()
   defp fingerprint(%PrivKey{} = key) do
     key
     |> generate_pub_key(:compressed)
     |> fingerprint()
   end
+
+  @spec fingerprint(pubkey()) :: binary()
   defp fingerprint(%PubKey{key: pub_key}) do
     pub_key
     |> compress()
     |> fingerprint()
   end
+
+  @spec fingerprint(binary()) :: binary()
   defp fingerprint(pub_key) do
     <<f_print::binary-4, _rest::binary>> =
       :crypto.hash(:ripemd160, :crypto.hash(:sha256, pub_key))
     f_print
   end
 
+  @spec serialize(privkey()) :: t()
   defp serialize(%PrivKey{} = key) do
-    {<<key.version::size(32)>>,
-     <<key.depth::size(8),
-     key.f_print::binary-4,
-     key.child_num::size(32),
-     key.chain_code::binary,
-     <<0::size(8)>>, key.key::binary>>}
+    {
+      <<key.version::size(32)>>,
+      <<key.depth::size(8),
+      key.f_print::binary-4,
+      key.child_num::size(32),
+      key.chain_code::binary,
+      <<0::size(8)>>, key.key::binary>>
+    }
   end
+
+  @spec serialize(pubkey()) :: t()
   defp serialize(%PubKey{} = key) do
-    {<<key.version::size(32)>>,
-     <<key.depth::size(8),
-     key.f_print::binary-4,
-     key.child_num::size(32),
-     key.chain_code::binary,
-     compress(key.key)::binary>>}
+    {
+      <<key.version::size(32)>>,
+      <<key.depth::size(8),
+      key.f_print::binary-4,
+      key.child_num::size(32),
+      key.chain_code::binary,
+      compress(key.key)::binary>>
+    }
   end
 
   @doc """
@@ -122,17 +167,25 @@ defmodule Aewallet.KeyPair do
       iex> KeyPair.format_key(key)
       "xprv9ykQk99RM1ihJkrSMmfn28SEZiF79geaDvMHGJz6b2zmSvzdmWmru2ScVujbbkJ9kVUrVNNhER5373sZSUcfJYhNSGyg64VB9jm5aP9oAga"
   """
+  @spec format_key(map()) :: String.t()
   def format_key(key) when is_map(key) do
     {prefix, bip32_serialization} = serialize(key)
     Base58Check.encode58check(prefix, bip32_serialization)
   end
 
-  def derive(key, <<"m/", path::binary>>) do ## Deriving private keys
+  # Deriving private keys.
+  @spec derive(map(), String.t()) :: map()
+  def derive(key, <<"m/", path::binary>>) do
     derive(key, path, :private)
   end
-  def derive(key, <<"M/", path::binary>>) do ## Deriving public keys
+
+  # Deriving public keys.
+  @spec derive(map(), String.t()) :: map()
+  def derive(key, <<"M/", path::binary>>) do
     derive(key, path, :public)
   end
+
+  @spec derive(map(), String.t(), tuple()) :: map()
   defp derive(key, path, type) do
     KeyPair.derive_pathlist(
       key,
@@ -152,9 +205,16 @@ defmodule Aewallet.KeyPair do
       type)
   end
 
+  @spec derive_pathlist(privkey(), list(), tuple()) :: privkey()
   def derive_pathlist(%PrivKey{} = key, [], :private), do: key
+
+  @spec derive_pathlist(privkey(), list(), tuple()) :: pubkey()
   def derive_pathlist(%PrivKey{} = key, [], :public), do: KeyPair.to_public_key(key)
+
+  @spec derive_pathlist(pubkey(), list(), tuple()) :: pubkey()
   def derive_pathlist(%PubKey{} = key, [], :public), do: key
+
+  @spec derive_pathlist(map(), list(), tuple()) :: map()
   def derive_pathlist(key, pathlist, type) do
     [index | rest] = pathlist
     key
@@ -162,6 +222,7 @@ defmodule Aewallet.KeyPair do
     |> KeyPair.derive_pathlist(rest, type)
   end
 
+  @spec derive_key(privkey(), integer()) :: privkey()
   def derive_key(%PrivKey{} = key, index) when index > -1 and index <= @mersenne_prime do
     # Normal derivation
     compressed_pub_key =
@@ -177,6 +238,7 @@ defmodule Aewallet.KeyPair do
     KeyPair.derive_key(key, child_key, child_chain, index)
   end
 
+  @spec derive_key(privkey(), integer()) :: privkey()
   def derive_key(%PrivKey{} = key, index) when index > @mersenne_prime do
     # Hardned derivation
     <<derived_key::size(256), child_chain::binary>> =
@@ -189,6 +251,7 @@ defmodule Aewallet.KeyPair do
     KeyPair.derive_key(key, child_key, child_chain, index)
   end
 
+  @spec derive_key(pubkey(), integer()) :: pubkey()
   def derive_key(%PubKey{} = key, index) when index > -1 and index <= @mersenne_prime do
     # Normal derivation
     serialized_pub_key = compress(key.key)
@@ -203,11 +266,13 @@ defmodule Aewallet.KeyPair do
     KeyPair.derive_key(key, child_key, child_chain, index)
   end
 
+  @spec derive_key(pubkey(), integer()) :: String.t()
   def derive_key(%PubKey{}, index) when index > @mersenne_prime do
     # Hardned derivation
     raise(RuntimeError, "Cannot derive Public Hardened child")
   end
 
+  @spec derive_key(map(), integer(), binary(), integer()) :: map()
   def derive_key(key, child_key, child_chain, index) when is_map(key) do
     %{key |
       key: child_key,
@@ -242,10 +307,12 @@ defmodule Aewallet.KeyPair do
     end
   end
 
+  @spec generate_wallet_address(binary(), tuple(), opts()) :: String.t()
   def generate_wallet_address(public_key, network, _wallet_type) do
     throw("The #{network} network is not supported! Please use :mainnet or :testnet")
   end
 
+  @spec generate_address(binary(), integer()) :: String.t()
   defp generate_address(public_key, net_bytes) do
     pub_ripemd160 =
       :crypto.hash(:ripemd160, :crypto.hash(:sha256, public_key))
@@ -258,6 +325,7 @@ defmodule Aewallet.KeyPair do
     Base58Check.encode58(pub_with_netbytes <> checksum)
   end
 
+  @spec compress(binary()) :: binary()
   defp compress(<<_prefix::size(8), x_coordinate::size(256), y_coordinate::size(256)>>) do
     prefix = case rem(y_coordinate, 2) do
       0 -> 0x02

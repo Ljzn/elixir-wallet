@@ -16,7 +16,7 @@ The mnemonic phrase is encrypted using the AES algorithm with the CBC cipher mod
 In code goes like follows
 
 ```elixir
-Aewallet.Cypher.encrypt("text to encrypt", "password") 
+Aewallet.Cypher.encrypt("text to encrypt", "password")
 ```
 
 ```elixir
@@ -30,7 +30,7 @@ Aewallet.Cypher.decrypt(encrypted, "pass")
 ## From Mnemonic to seed
 
 
-To create a seed from an already generated mnemonic phrase use the following function. 
+To create a seed from an already generated mnemonic phrase use the following function.
 ```elixir
 seed = Aewallet.KeyPair.generate_seed(mnemonic)
 ```
@@ -71,7 +71,7 @@ After we have generated the extended private key we can convert it to public key
 extended_pub_key = Aewallet.KeyPair.generate_pub_key(extended_private_key)
 ```
 
-If the private key has an Aeternity prefix, an Aeternity public key shall be created, otherwise a Bitcoin public key. 
+If the private key has an Aeternity prefix, an Aeternity public key shall be created, otherwise a Bitcoin public key.
 
 
 ### Creating the Address
@@ -139,4 +139,3 @@ end
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at [https://hexdocs.pm/elixir_wallet](https://hexdocs.pm/elixir_wallet).
-

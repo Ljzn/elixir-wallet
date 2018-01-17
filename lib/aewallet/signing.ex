@@ -1,5 +1,4 @@
 defmodule Aewallet.Signing do
-
   @moduledoc """
   Module for signing and verifying transactions using the ECDSA algorithm
   """
@@ -13,9 +12,9 @@ defmodule Aewallet.Signing do
       93, 47, 64, 11, 104, 94, 240, 192, 240, 229, 55, 137, 226, 15, 119, 156, 52,
       165, 170, 163, 2, 33, 0, 234, 132, 82, 122, 244, 209, 148, 232, 124, 216, ...>>
   """
-  @spec sign(Binary.t(), Binary.t()) :: Binary.t()
-  def sign(message, privkey_bin) do
-    :crypto.sign(:ecdsa, :sha256, message, [privkey_bin, :secp256k1])
+  @spec sign(binary(), binary()) :: binary()
+  def sign(data, privkey_bin) do
+    :crypto.sign(:ecdsa, :sha256, data, [privkey_bin, :secp256k1])
   end
 
   @doc """
@@ -32,9 +31,9 @@ defmodule Aewallet.Signing do
 
       :true
   """
-  @spec verify(Binary.t(), Binary.t(), Binary.t()) :: Atom.t()
-  def verify(message, signature_bin, pubkey_bin) do
-    if :crypto.verify(:ecdsa, :sha256, message, signature_bin, [pubkey_bin, :secp256k1]) do
+  @spec verify(binary(), binary(), binary()) :: boolean()
+  def verify(data, signature_bin, pubkey_bin) do
+    if :crypto.verify(:ecdsa, :sha256, data, signature_bin, [pubkey_bin, :secp256k1]) do
       :true
     else
       :false

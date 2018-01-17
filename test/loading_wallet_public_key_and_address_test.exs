@@ -3,74 +3,94 @@ defmodule LoadPublicKeyAndAddressTest do
   doctest Aewallet
 
   alias Aewallet.Wallet, as: Wallet
+  alias Aewallet.Cypher, as: Cypher
 
   test "validate master public key and address 1" do
-    mnemonic = Wallet.load_wallet_file("test/test_wallets/wallet--2017-11-1-16-35-48", "password")
-    assert {:ok, "bulk\r property\r loop\r pen\r fuel\r wild\r gorilla\r say\r pond\r rigid\r torch\r budget"}
-    = mnemonic
+    mnemonic = load_wallet_file("test/test_wallets/wallet--2018-1-17-11-59-25", "password")
+    assert mnemonic =
+    {:ok, "day slot wink brother tip program motion kite trash excuse assume debris", :ae}
 
-    {:ok, public_key} =
-      Wallet.get_public_key("test/test_wallets/wallet--2017-11-1-16-35-48", "password")
+    {:ok, public_key, :ae} =
+      Wallet.get_public_key("test/test_wallets/wallet--2018-1-17-11-59-25", "password")
 
-    assert public_key == Base.decode16!("04C232B177F8EDB01290C3FEDBE5231BDF67AEF24F4C7947B06A298C5CDA573E16ADB2A621525C44222D29E113B315508B32364584EDF99F8DE7E0D7C2D2A871AB")
+    assert public_key ==
+      Base.decode16!("0443C79213D6301FB19C50CEFCBBC2EE80CD53ACEFE9D4FB1FEE4E1DD3863F643095C24FD54EF4959A554B3461726B789D4D8E0C97526C3A18A39E16B326FF6D5A")
 
-    {:ok, address} = Wallet.get_address("test/test_wallets/wallet--2017-11-1-16-35-48", "password")
-    assert address == "1JWrJcwMRbxXk68nmA2gQ9Ly4BT7GhuAyt"
+    {:ok, address} = Wallet.get_address("test/test_wallets/wallet--2018-1-17-11-59-25", "password")
+    assert address == "Aw1EeJtR3xNmi5fy6Mu9xL8xqzKPzrY36w"
   end
 
   test "validate master public key and address 2" do
-    mnemonic = Wallet.load_wallet_file("test/test_wallets/wallet--2017-11-1-16-35-57", "password")
-    assert {:ok, "able\r actress\r bring\r rebuild\r clean\r timber\r flash\r grace\r tribe\r trial\r income\r brother"}
-    = mnemonic
+    mnemonic = load_wallet_file("test/test_wallets/wallet--2018-1-17-12-9-55", "password")
+    assert mnemonic =
+    {:ok, "bacon olympic warfare link crystal liberty mechanic husband age scan glance job", :btc}
 
-    {:ok, public_key} =
-      Wallet.get_public_key("test/test_wallets/wallet--2017-11-1-16-35-57", "password")
+    {:ok, public_key, :btc} =
+      Wallet.get_public_key("test/test_wallets/wallet--2018-1-17-12-9-55", "password")
 
-    assert public_key == Base.decode16!("04BCD5FBFE8563FD97AFAEBAEB3B81CF22D10AD89FC905ECF5BFCE85849E417458100A66C442A942DC512181A4563AFFF3604F1F7D553FBF1A50B788F9102D1DA8")
+    assert public_key ==
+      Base.decode16!("04C64160211603FB738BFD69AFEC4BC675D7AEDB7BDD06D5CC661D33EA3021AAD4FDA318B310487FBFF91DEC887F13E57394EEBB3FD34876F1793F7D427BD17718")
 
-    {:ok, address} = Wallet.get_address("test/test_wallets/wallet--2017-11-1-16-35-57", "password")
-    assert address == "1PruVefxahxDZcWiVYU7nYZxrMHKS97qvW"
+    {:ok, address} = Wallet.get_address("test/test_wallets/wallet--2018-1-17-12-9-55", "password")
+    assert address == "1LZsufgWrF6WbS5e39J4jiMJNwWpHEGA75"
   end
 
    test "validate master public key and address 3" do
-    mnemonic = Wallet.load_wallet_file("test/test_wallets/wallet--2017-11-1-16-35-58", "password")
-    assert {:ok, "tenant\r thrive\r marble\r magnet\r chief\r taxi\r enhance\r verb\r session\r saddle\r venue\r during"}
-    = mnemonic
+    mnemonic = load_wallet_file("test/test_wallets/wallet--2018-1-17-12-12-16", "password")
+    assert mnemonic =
+    {:ok, "dial prevent prize already actual hammer alarm warfare crunch recipe tide bind", :ae, "1234"}
 
-    {:ok, public_key} =
-      Wallet.get_public_key("test/test_wallets/wallet--2017-11-1-16-35-58", "password")
+    {:ok, public_key, :ae} =
+      Wallet.get_public_key("test/test_wallets/wallet--2018-1-17-12-12-16", "password")
 
-    assert public_key == Base.decode16!("044A4435503E7E324C9AE6B966C9F43CEECCDEAE192969AD2C6E9E5963AC65E62C9C21D1CC395E8C8639B30975471B588191A67C084F0AAD08D63E6F33CA47D348")
+    assert public_key ==
+      Base.decode16!("04169FE30E399CC4B6BF5CFCB8CD7091D462D5B50E8082C7D9C0A54080E77BE056777BB1596050E34462131AA07C24196E108CBD890AC9A7EA19665BB5F6E6A142")
 
-    {:ok, address} = Wallet.get_address("test/test_wallets/wallet--2017-11-1-16-35-58", "password")
-    assert address == "12C72EW63jLCaDXfmqk6DcjUoUykdD6Xhn"
+    {:ok, address} = Wallet.get_address("test/test_wallets/wallet--2018-1-17-12-12-16", "password")
+    assert address == "Ar4VeTDWQFE97LDFQ2De2Gg4fHf2FHeRqP"
   end
 
-  test "validate master public key and address 4" do
-    mnemonic = Wallet.load_wallet_file("test/test_wallets/wallet--2017-11-1-16-35-59", "password")
-    assert {:ok, "drum\r pledge\r man\r fame\r sort\r favorite\r doll\r color\r device\r remove\r angry\r jelly"}
-    = mnemonic
-
-    {:ok, public_key} =
-      Wallet.get_public_key("test/test_wallets/wallet--2017-11-1-16-35-59", "password")
-
-    assert public_key == Base.decode16!("04B9A2BF7834AF55B1BC4356F74A11D8A8D1AA4CFC9635699FCE71C2F9186B5EC07EE55CC8452A9C3535589EA12D792FEA4E907C2FE0E1E0AEAF91D86E033607C1")
-
-    {:ok, address} = Wallet.get_address("test/test_wallets/wallet--2017-11-1-16-35-59", "password")
-    assert address == "13F4jMJmUFV9rmoWgGND1jBfwgQbTKpPuv"
+  @spec load_wallet(String.t(), String.t()) :: Tuple.t()
+  defp load_wallet_file(file_path, password) do
+    load_wallet(File.read(file_path), password)
   end
-
-  test "validate master public key and address 5" do
-    mnemonic = Wallet.load_wallet_file("test/test_wallets/wallet--2017-11-1-16-36-0", "password")
-    assert {:ok, "year\r wage\r suggest\r cream\r good\r length\r umbrella\r ridge\r winter\r giant\r blast\r improve"}
-    = mnemonic
-
-    {:ok, public_key} =
-      Wallet.get_public_key("test/test_wallets/wallet--2017-11-1-16-36-0", "password")
-
-    assert public_key == Base.decode16!("048BF1724D1C9695D74D3948E59C89EDC1156FF9159A073507C76E99BC45F2008CC05E7BBC7F50E00311EFF62D46C8F66C4DB39D77274F0F2D0F7DE5606E8A16E8")
-
-    {:ok, address} = Wallet.get_address("test/test_wallets/wallet--2017-11-1-16-36-0", "password")
-    assert address == "1LfdSWu1eEijd6GzTh8SASMsTU8wDgbtfB"
+  defp load_wallet({:ok, encrypted_data}, password) do
+    wallet_data = Cypher.decrypt(encrypted_data, password)
+    if String.valid? wallet_data do
+      data_list = String.split(wallet_data)
+      mnemonic =
+        data_list
+        |> Enum.slice(0..11)
+        |> Enum.join(" ")
+      wallet_type =
+        data_list
+        |> Enum.at(12)
+        |> String.to_atom()
+      case Enum.at(data_list, 13) do
+        :nil ->
+          {:ok, mnemonic, wallet_type}
+        pass_phrase ->
+          {:ok, mnemonic, wallet_type, pass_phrase}
+        _ ->
+          {:ok, mnemonic, wallet_type}
+      end
+    else
+      {:error, "Invalid password"}
+    end
+  end
+  defp load_wallet({:error, reason}, _password) do
+    case reason do
+      :enoent ->
+        {:error, "The file does not exist."}
+      :eaccess ->
+        {:error, "Missing permision for reading the file,
+        or for searching one of the parent directories."}
+      :eisdir ->
+        {:error, "The named file is a directory."}
+      :enotdir ->
+        {:error, "A component of the file name is not a directory."}
+      :enomem ->
+        {:error, "There is not enough memory for the contents of the file."}
+    end
   end
 end
