@@ -42,6 +42,12 @@ defmodule Aewallet.KeyPair do
   # Used as guard for the key derivation type: normal / hardned
   @mersenne_prime 2_147_483_647
 
+  # Prefixes for creating address on the Mainnet
+  @main_networks [ae: 0x18, btc: 0x00]
+
+  # Prefixes for creating address on Testnet
+  @test_networks [ae: 0x42, btc: 0x6F]
+
   @doc """
   Generates a seed from the given mnemonic and pass_phrase
   """
@@ -50,20 +56,36 @@ defmodule Aewallet.KeyPair do
   end
 
   @doc """
-  Generates master private extended key.
+  Generates master private extended key. Where you can state the network
+  the key should be working on and select a type of key. The default network
+  is `:mainnet` and the default key type is `:ae`
+
+  ## Networks
+
+    * `:mainnet` - Creates key for the Mainnet
+    * `:testnet` - Creates key for the Testnet
+
+  ## Options
+
+  The accepted options are:
+
+    * `:type` - specifies the type of wallet
+
+  The values for `:type` are:
+
+    * `:ae` - creates an Aeternity wallet
+    * `:btc` - creates a Bitcoin wallet
+
   ## Examples
-      iex> generate_master_key(seed_bin, :btc)
+      iex> generate_master_key(seed_bin, :mainnet, :ae)
       master_extended_btc_key
 
-      iex> generate_master_key(seed_bin, :ae)
+      iex> generate_master_key(seed_bin, :testnet, :ae)
       master_extended_ae_key
 
-  ## Currencies
-     -  `:btc` - Creates a `Bitcoin` key
-     -  `:ae`  - Creates an `Aeternity` key
   """
   @spec generate_master_key(Binary.t(), opts()) :: privkey()
-  def generate_master_key(seed_bin, network, opts \\ []) do
+  def generate_master_key(seed_bin, network \\ :mainnet, opts \\ []) do
     type = Keyword.get(opts, :type, :ae)
     seed = case type do
       :ae ->
@@ -186,7 +208,7 @@ defmodule Aewallet.KeyPair do
   end
 
   @spec derive(map(), String.t(), tuple()) :: map()
-  defp derive(key, path, type) do
+  defp derive(key, path, network) do
     KeyPair.derive_pathlist(
       key,
       :lists.map(fn(elem) ->
@@ -202,7 +224,7 @@ defmodule Aewallet.KeyPair do
             num
         end
       end, :binary.split(path, <<"/">>, [:global])),
-      type)
+      network)
   end
 
   @spec derive_pathlist(privkey(), list(), tuple()) :: privkey()
@@ -215,11 +237,11 @@ defmodule Aewallet.KeyPair do
   def derive_pathlist(%PubKey{} = key, [], :public), do: key
 
   @spec derive_pathlist(map(), list(), tuple()) :: map()
-  def derive_pathlist(key, pathlist, type) do
+  def derive_pathlist(key, pathlist, network) do
     [index | rest] = pathlist
     key
     |> derive_key(index)
-    |> KeyPair.derive_pathlist(rest, type)
+    |> KeyPair.derive_pathlist(rest, network)
   end
 
   @spec derive_key(privkey(), integer()) :: privkey()
@@ -286,29 +308,27 @@ defmodule Aewallet.KeyPair do
   Generates wallet address from a given public key
 
   Network ID `Bitcoin` bytes:
-    -  mainnet = `0x00`
-    -  testnet = `0x6F`
+    * :mainnet = `0x00`
+    * :testnet = `0x6F`
 
   Network ID `Aeternity` bytes:
-    -  mainnet = `0x18`
-    -  testnet = `0x42`
+    * :mainnet = `0x18`
+    * :testnet = `0x42`
   """
-  main_networks = [ae: 0x18, btc: 0x00]
-  for {case, net_bytes} <- main_networks do
+  for {case, net_bytes} <- @main_networks do
     def generate_wallet_address(public_key, :mainnet, unquote(case)) do
       generate_address(public_key, unquote(net_bytes))
     end
   end
 
-  test_networks = [ae: 0x42, btc: 0x6F]
-  for {case, net_bytes} <- test_networks do
+  for {case, net_bytes} <- @test_networks do
     def generate_wallet_address(public_key, :testnet, unquote(case)) do
       generate_address(public_key, unquote(net_bytes))
     end
   end
 
   @spec generate_wallet_address(binary(), tuple(), opts()) :: String.t()
-  def generate_wallet_address(public_key, network, _wallet_type) do
+  def generate_wallet_address(_public_key, network, _wallet_type) do
     throw("The #{network} network is not supported! Please use :mainnet or :testnet")
   end
 
