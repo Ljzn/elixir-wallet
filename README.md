@@ -74,7 +74,7 @@ If you don't state options Aeternity keys will be created by default!
 
 After we have generated the extended private key we can convert it to public key using the following function:
 ```elixir
-extended_pub_key = Aewallet.KeyPair.to_piblic_key(extended_private_key)
+extended_pub_key = Aewallet.KeyPair.to_public_key(extended_private_key)
 ```
 
 If the private key has an Aeternity prefix, an Aeternity public key shall be created, otherwise a Bitcoin public key.

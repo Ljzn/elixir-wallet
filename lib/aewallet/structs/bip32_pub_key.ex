@@ -3,6 +3,13 @@ defmodule Aewallet.Structs.Bip32PubKey do
   Module for holding the struct for a BIP32 Public key
   """
 
+  @typedoc "Wallet types"
+  @type currency :: :ae | :btc
+
+  @typedoc "Network types"
+  @type network :: :mainnet | :testnet
+
+  @typedoc "Structure of a key"
   @type t :: %__MODULE__{
           currency: atom(),
           network: atom(),
@@ -35,33 +42,25 @@ defmodule Aewallet.Structs.Bip32PubKey do
     :key
   ]
 
-  @spec create(atom(), atom()) :: t()
+  @spec create(network(), currency()) :: t()
   def create(:mainnet, :btc) do
-    default(@mainnet_btc_prefix, :btc, :mainnet)
+    default(@mainnet_btc_prefix, :mainnet, :btc)
   end
-
-  @spec create(atom(), atom()) :: t()
   def create(:testnet, :btc) do
-    default(@testnet_btc_prefix, :btc, :testnet)
+    default(@testnet_btc_prefix, :testnet, :btc)
   end
-
-  @spec create(atom(), atom()) :: t()
   def create(:mainnet, :ae) do
-    default(@mainnet_ae_prefix, :ae, :mainnet)
+    default(@mainnet_ae_prefix, :mainnet, :ae)
   end
-
-  @spec create(atom(), atom()) :: t()
   def create(:testnet, :ae) do
-    default(@testnet_ae_prefix, :ae, :testnet)
+    default(@testnet_ae_prefix, :testnet, :ae)
   end
-
-  @spec create(atom(), atom()) :: String.t()
   def create(network, _currency) do
-    throw("The given network #{network} is not supported! Please use either :miannet or :testnet")
+    throw("The given network #{network} is not supported! Please use either :mainnet or :testnet")
   end
 
-  @spec default(integer(), atom(), atom()) :: t()
-  defp default(version, currency, network) do
+  @spec default(integer(), network(), currency()) :: t()
+  defp default(version, network, currency) do
     %Aewallet.Structs.Bip32PubKey{
       currency: currency,
       network: network,

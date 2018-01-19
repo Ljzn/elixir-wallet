@@ -8,10 +8,10 @@ defmodule Aewallet.KeyPair do
   alias Aewallet.Structs.Bip32PrivKey, as: PrivKey
 
   @typedoc "Wallet option key"
-  @type key :: atom
+  @type key :: :type
 
   @typedoc "Wallet option value"
-  @type value :: any
+  @type value :: :ae | :btc
 
   @typedoc "Keyword options list"
   @type opts :: [{key, value}]
@@ -21,6 +21,9 @@ defmodule Aewallet.KeyPair do
 
   @typedoc "Public extended key struct"
   @type pubkey :: %PubKey{}
+
+  @typedoc "Public key type"
+  @type pubkey_type :: :compressed
 
   @typedoc "Structure of extended key"
   @type t :: %{
@@ -84,7 +87,7 @@ defmodule Aewallet.KeyPair do
       master_extended_ae_key
 
   """
-  @spec generate_master_key(Binary.t(), opts()) :: privkey()
+  @spec generate_master_key(binary(), opts()) :: privkey()
   def generate_master_key(seed_bin, network \\ :mainnet, opts \\ []) do
     type = Keyword.get(opts, :type, :ae)
     seed = case type do
@@ -131,7 +134,7 @@ defmodule Aewallet.KeyPair do
     pub_key
   end
 
-  @spec generate_pub_key(privkey(), atom()) :: binary()
+  @spec generate_pub_key(privkey(), pubkey_type()) :: binary()
   defp generate_pub_key(%PrivKey{} = key, :compressed) do
     key
     |> generate_pub_key()
@@ -144,15 +147,11 @@ defmodule Aewallet.KeyPair do
     |> generate_pub_key(:compressed)
     |> fingerprint()
   end
-
-  @spec fingerprint(pubkey()) :: binary()
   defp fingerprint(%PubKey{key: pub_key}) do
     pub_key
     |> compress()
     |> fingerprint()
   end
-
-  @spec fingerprint(binary()) :: binary()
   defp fingerprint(pub_key) do
     <<f_print::binary-4, _rest::binary>> =
       :crypto.hash(:ripemd160, :crypto.hash(:sha256, pub_key))
@@ -170,8 +169,6 @@ defmodule Aewallet.KeyPair do
       <<0::size(8)>>, key.key::binary>>
     }
   end
-
-  @spec serialize(pubkey()) :: t()
   defp serialize(%PubKey{} = key) do
     {
       <<key.version::size(32)>>,
@@ -229,8 +226,6 @@ defmodule Aewallet.KeyPair do
 
   @spec derive_pathlist(privkey(), list(), tuple()) :: privkey()
   def derive_pathlist(%PrivKey{} = key, [], :private), do: key
-
-  @spec derive_pathlist(privkey(), list(), tuple()) :: pubkey()
   def derive_pathlist(%PrivKey{} = key, [], :public), do: KeyPair.to_public_key(key)
 
   @spec derive_pathlist(pubkey(), list(), tuple()) :: pubkey()
@@ -260,7 +255,6 @@ defmodule Aewallet.KeyPair do
     KeyPair.derive_key(key, child_key, child_chain, index)
   end
 
-  @spec derive_key(privkey(), integer()) :: privkey()
   def derive_key(%PrivKey{} = key, index) when index > @mersenne_prime do
     # Hardned derivation
     <<derived_key::size(256), child_chain::binary>> =
@@ -288,7 +282,6 @@ defmodule Aewallet.KeyPair do
     KeyPair.derive_key(key, child_key, child_chain, index)
   end
 
-  @spec derive_key(pubkey(), integer()) :: String.t()
   def derive_key(%PubKey{}, index) when index > @mersenne_prime do
     # Hardned derivation
     raise(RuntimeError, "Cannot derive Public Hardened child")

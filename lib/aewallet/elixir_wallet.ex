@@ -10,16 +10,22 @@ defmodule Aewallet.Wallet do
   alias Aewallet.Indexes, as: Indexes
 
   @typedoc "Wallet option key"
-  @type key :: atom
+  @type wallet_key :: :type
 
   @typedoc "Wallet option value"
-  @type value :: any
+  @type wallet_value :: :ae | :btc
 
   @typedoc "Wallet options list"
-  @type wallet_opts :: [{key, value}]
+  @type wallet_opts :: [{wallet_key, wallet_value}]
+
+  @typedoc "Network option key"
+  @type network_key :: :network
+
+  @typedoc "Network option value"
+  @type network_value :: :mainnet | :testnet
 
   @typedoc "Network options list"
-  @type network_opts :: [{key, value}]
+  @type network_opts :: [{network_key, network_value}]
 
   @wallet_types  [ae: :ae, btc: :btc]
 
@@ -78,6 +84,23 @@ defmodule Aewallet.Wallet do
     {:ok, wallet_data} = build_wallet(mnemonic_phrase, pass_phrase, type)
     {:ok, file_path} = save_wallet_file(wallet_data, password, path)
     {:ok, mnemonic_phrase, file_path, type}
+  end
+
+  @doc """
+  Loads the wallet data
+    * Mnemonic phrase
+    * Wallet type
+    * Pass_phrase (if given when wallet was created)
+
+  ## Example
+      iex> Aewallet.Wallet.load_wallet_file(file_path, password)
+      {:ok,
+      "amazing feed doctor wing town furnace need hat public that derive athlete",
+      :ae}
+  """
+  @spec load_wallet_file(String.t(), String.t()) :: tuple()
+  def load_wallet_file(file_path, password) do
+    load_wallet(File.read(file_path), password)
   end
 
   @doc """
@@ -223,10 +246,7 @@ defmodule Aewallet.Wallet do
     end
   end
 
-  @spec load_wallet(String.t(), String.t()) :: tuple()
-  defp load_wallet_file(file_path, password) do
-    load_wallet(File.read(file_path), password)
-  end
+  @spec load_wallet(tuple(), String.t()) :: tuple()
   defp load_wallet({:ok, encrypted_data}, password) do
     wallet_data = Cypher.decrypt(encrypted_data, password)
     if String.valid? wallet_data do

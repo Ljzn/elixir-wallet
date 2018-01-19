@@ -45,7 +45,7 @@ defmodule Aewallet.Cypher do
     {ivec, :crypto.stream_init(:aes_ctr, key, ivec)}
   end
 
-  @spec get_stream_state(String.t(), binary) :: tuple()
+  @spec get_stream_state(String.t(), binary()) :: tuple()
   defp get_stream_state(password, ivec) do
     {password_dec, _remainder} = Integer.parse(Base.encode16(password), 16)
 

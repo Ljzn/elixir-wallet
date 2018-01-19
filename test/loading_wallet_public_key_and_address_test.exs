@@ -6,8 +6,8 @@ defmodule LoadPublicKeyAndAddressTest do
   alias Aewallet.Cypher, as: Cypher
 
   test "validate master public key and address 1" do
-    mnemonic = load_wallet_file("test/test_wallets/wallet--2018-1-17-11-59-25", "password")
-    assert mnemonic =
+    wallet_data = Wallet.load_wallet_file("test/test_wallets/wallet--2018-1-17-11-59-25", "password")
+    assert wallet_data =
     {:ok, "day slot wink brother tip program motion kite trash excuse assume debris", :ae}
 
     {:ok, public_key, :ae} =
@@ -21,8 +21,8 @@ defmodule LoadPublicKeyAndAddressTest do
   end
 
   test "validate master public key and address 2" do
-    mnemonic = load_wallet_file("test/test_wallets/wallet--2018-1-17-12-9-55", "password")
-    assert mnemonic =
+    wallet_data = Wallet.load_wallet_file("test/test_wallets/wallet--2018-1-17-12-9-55", "password")
+    assert wallet_data =
     {:ok, "bacon olympic warfare link crystal liberty mechanic husband age scan glance job", :btc}
 
     {:ok, public_key, :btc} =
@@ -36,8 +36,8 @@ defmodule LoadPublicKeyAndAddressTest do
   end
 
    test "validate master public key and address 3" do
-    mnemonic = load_wallet_file("test/test_wallets/wallet--2018-1-17-12-12-16", "password")
-    assert mnemonic =
+    wallet_data = Wallet.load_wallet_file("test/test_wallets/wallet--2018-1-17-12-12-16", "password")
+    assert wallet_data =
     {:ok, "dial prevent prize already actual hammer alarm warfare crunch recipe tide bind", :ae, "1234"}
 
     {:ok, public_key, :ae} =
@@ -48,49 +48,5 @@ defmodule LoadPublicKeyAndAddressTest do
 
     {:ok, address} = Wallet.get_address("test/test_wallets/wallet--2018-1-17-12-12-16", "password")
     assert address == "Ar4VeTDWQFE97LDFQ2De2Gg4fHf2FHeRqP"
-  end
-
-  @spec load_wallet(String.t(), String.t()) :: Tuple.t()
-  defp load_wallet_file(file_path, password) do
-    load_wallet(File.read(file_path), password)
-  end
-  defp load_wallet({:ok, encrypted_data}, password) do
-    wallet_data = Cypher.decrypt(encrypted_data, password)
-    if String.valid? wallet_data do
-      data_list = String.split(wallet_data)
-      mnemonic =
-        data_list
-        |> Enum.slice(0..11)
-        |> Enum.join(" ")
-      wallet_type =
-        data_list
-        |> Enum.at(12)
-        |> String.to_atom()
-      case Enum.at(data_list, 13) do
-        :nil ->
-          {:ok, mnemonic, wallet_type}
-        pass_phrase ->
-          {:ok, mnemonic, wallet_type, pass_phrase}
-        _ ->
-          {:ok, mnemonic, wallet_type}
-      end
-    else
-      {:error, "Invalid password"}
-    end
-  end
-  defp load_wallet({:error, reason}, _password) do
-    case reason do
-      :enoent ->
-        {:error, "The file does not exist."}
-      :eaccess ->
-        {:error, "Missing permision for reading the file,
-        or for searching one of the parent directories."}
-      :eisdir ->
-        {:error, "The named file is a directory."}
-      :enotdir ->
-        {:error, "A component of the file name is not a directory."}
-      :enomem ->
-        {:error, "There is not enough memory for the contents of the file."}
-    end
   end
 end
