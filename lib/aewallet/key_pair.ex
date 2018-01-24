@@ -308,14 +308,14 @@ defmodule Aewallet.KeyPair do
     * :mainnet = `0x18`
     * :testnet = `0x42`
   """
-  for {case, net_bytes} <- @main_networks do
-    def generate_wallet_address(public_key, :mainnet, unquote(case)) do
+  for {wallet_type, net_bytes} <- @main_networks do
+    def generate_wallet_address(public_key, :mainnet, unquote(wallet_type)) do
       generate_address(public_key, unquote(net_bytes))
     end
   end
 
-  for {case, net_bytes} <- @test_networks do
-    def generate_wallet_address(public_key, :testnet, unquote(case)) do
+  for {wallet_type, net_bytes} <- @test_networks do
+    def generate_wallet_address(public_key, :testnet, unquote(wallet_type)) do
       generate_address(public_key, unquote(net_bytes))
     end
   end
