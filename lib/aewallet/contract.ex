@@ -1,8 +1,7 @@
 defmodule Aewallet.Contract do
   @moduledoc """
-  This module is responsible for the functionality needed
-  for the SignContract app, Encryption and Decryption of a contract file
-  as well as signing the contract itself
+  This module is responsible for Encryption and Decryption of a file
+  using a public and it's corresponding private key
   """
 
   alias Aewallet.Cypher, as: Cypher
@@ -16,7 +15,9 @@ defmodule Aewallet.Contract do
   """
   @spec encrypt(String.t(), binary()) :: tuple()
   def encrypt(file_path, pub_key) do
-    read_file(File.read(file_path), pub_key, file_path, :encrypt)
+    {:ok, contract_data} = read_file(File.read(file_path), pub_key, file_path)
+    {:ok, encrypted_data} = do_encrypt(contract_data, pub_key, file_path)
+    save_file(encrypted_data, file_path, :encrypt)
   end
 
   @doc """
@@ -26,21 +27,20 @@ defmodule Aewallet.Contract do
   """
   @spec decrypt(String.t(), binary()) :: tuple()
   def decrypt(file_path, priv_key) do
-    read_file(File.read(file_path), priv_key, file_path, :decrypt)
+    {:ok, contract_data} = read_file(File.read(file_path), priv_key, file_path)
+    {:ok, decrypted_data} = do_decrypt(contract_data, priv_key, file_path)
+    save_file(decrypted_data, file_path, :decrypt)
   end
 
   ## Private functions.
 
-  @spec read_file(tuple(), binary(), String.t(), option()) :: tuple()
-  defp read_file({:ok, contract_data}, pub_key, file_path, :encrypt) do
-    do_encrypt(contract_data, pub_key, file_path)
-  end
-  defp read_file({:ok, contract_data}, priv_key, file_path, :decrypt) do
-    do_decrypt(contract_data, priv_key, file_path)
+  @spec read_file(tuple(), binary(), String.t()) :: tuple()
+  defp read_file({:ok, contract_data}, pub_key, file_path) do
+    {:ok, contract_data}
   end
 
-  @spec read_file(tuple(), binary(), String.t(), option()) :: tuple()
-  defp read_file({:error, reason}, _key, file_path, _option) do
+  @spec read_file(tuple(), binary(), String.t()) :: tuple()
+  defp read_file({:error, reason}, _key, file_path) do
     case reason do
       :enoent ->
         {:error, "The file at #{file_path} does not exist."}
@@ -91,7 +91,7 @@ defmodule Aewallet.Contract do
 
     encrypted_contract = Cypher.encrypt(contract_data, encryptor)
 
-    save_file(helper_key <> encrypted_contract, file_path, :encrypt)
+    {:ok, helper_key <> encrypted_contract}
   end
 
   @spec do_decrypt(binary(), binary(), String.t()) :: tuple()
@@ -101,7 +101,7 @@ defmodule Aewallet.Contract do
     {:ok, decryptor} = :libsecp256k1.ec_pubkey_tweak_mul(helper_key, priv_key)
     decrypted_contract = Cypher.decrypt(contract_data, decryptor)
 
-    save_file(decrypted_contract, file_path, :decrypt)
+    {:ok, decrypted_contract}
   end
 
 end
