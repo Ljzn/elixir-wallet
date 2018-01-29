@@ -4,7 +4,7 @@
 The mnemonic phrase is created following the [BIP-0039](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawiki)
 
 ```elixir
-indexes = Aewallet.GenerateIndexes.generate_indexes()
+indexes = Aewallet.Indexes.generate_indexes()
 Aewallet.Mnemonic.generate_phrase(indexes)
 ```
 
@@ -16,11 +16,11 @@ The mnemonic phrase is encrypted using the AES algorithm with the CBC cipher mod
 In code goes like follows
 
 ```elixir
-Aewallet.Cypher.encrypt("text to encrypt", "password") 
+Aewallet.Cypher.encrypt(data_to_encrypt, "password")
 ```
 
 ```elixir
-Aewallet.Cypher.decrypt(encrypted, "pass")
+Aewallet.Cypher.decrypt(encrypted_data, "password")
 ```
 
 
@@ -30,7 +30,7 @@ Aewallet.Cypher.decrypt(encrypted, "pass")
 ## From Mnemonic to seed
 
 
-To create a seed from an already generated mnemonic phrase use the following function. 
+To create a seed from an already generated mnemonic phrase use the following function.
 ```elixir
 seed = Aewallet.KeyPair.generate_seed(mnemonic)
 ```
@@ -56,31 +56,44 @@ Every key in the HD wallet is deterministically derived from this root seed, whi
 After we have generated our seed we can use to generate the Master Private key use the following function
 
 ```elixir
-master_priv_key = Aewallet.KeyPair.generate_master_key(seed, currency)
+master_priv_key = Aewallet.KeyPair.generate_master_key(seed, network, opts)
 ```
 
-For the currency you could use the following atoms:
-Bitcoin keys - `:btc`
-Aeternity keys - `:ae`
+For the network you could use the following atoms:
+For creating keys on Mainnet - `:mainnet`
+For creating keys on Testnet - `:testnet`
+
+For opts you could use only the option `:type` and as for values:
+For Aeternity keys use - `:ae`
+For Bitcoin keys use   - `:btc`
+
+If you don't state options Aeternity keys will be created by default!
 
 
 ### Creating extended Public key
 
 After we have generated the extended private key we can convert it to public key using the following function:
 ```elixir
-extended_pub_key = Aewallet.KeyPair.generate_pub_key(extended_private_key)
+extended_pub_key = Aewallet.KeyPair.to_public_key(extended_private_key)
 ```
 
-If the private key has an Aeternity prefix, an Aeternity public key shall be created, otherwise a Bitcoin public key. 
+If the private key has an Aeternity prefix, an Aeternity public key shall be created, otherwise a Bitcoin public key.
 
 
 ### Creating the Address
 
-
 Having already the Public key generated, we can derive the address as follows
 ```elixir
-address = Aewallet.KeyPair.generate_wallet_address(pub_key)
+address = Aewallet.KeyPair.generate_wallet_address(pub_key, network, opts)
 ```
+
+For the network you could use the following atoms:
+For creating address on Mainnet - `:mainnet`
+For creating address on Testnet - `:testnet`
+
+For opts you could use only the option `:type` and as for values:
+For Aeternity address use - `:ae`
+For Bitcoin address use - `:btc`
 
 ### Deriving a child key
 
@@ -88,13 +101,15 @@ Once we have the master extended keys we can use them to derive children using t
 
 If we want to derive child private key we will use lowercase `m` in the path
 ```elixir
-Aewallet.KeyPair.derive(extended_priv_key, "m/0'")
+Aewallet.KeyPair.derive(extended_priv_key, "m/0'", network)
 ```
 
 If we want to derive child public key we will use uppercase `M` in the path
 ```elixir
-Aewallet.KeyPair.derive(extended_priv_key, "M/0'")
+Aewallet.KeyPair.derive(extended_priv_key, "M/0'", network)
 ```
+
+For network use either `:mainnet` or `:testnet`
 
 To derive hardned key use an apostrophe `'` sign after the number and a slash `/` to go deeper in the hierarchy
 
@@ -139,4 +154,3 @@ end
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at [https://hexdocs.pm/elixir_wallet](https://hexdocs.pm/elixir_wallet).
-

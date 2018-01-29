@@ -1,6 +1,4 @@
 defmodule Aewallet.Wallet do
-  require Logger
-
   @moduledoc """
   This module is used for creation of the Wallet file. To inspect it use
   WalletCrypto.decrypt_wallet("wallet_file_name", "password", "mnemonic_phrase")
@@ -9,78 +7,264 @@ defmodule Aewallet.Wallet do
   alias Aewallet.KeyPair, as: KeyPair
   alias Aewallet.Cypher, as: Cypher
   alias Aewallet.Mnemonic, as: Mnemonic
-  alias Aewallet.GenerateIndexes, as: GenerateIndexes
+  alias Aewallet.Indexes, as: Indexes
+
+  @typedoc "Wallet option key"
+  @type wallet_key :: :type
+
+  @typedoc "Wallet option value"
+  @type wallet_value :: :ae | :btc
+
+  @typedoc "Wallet options list"
+  @type wallet_opts :: [{wallet_key, wallet_value}]
+
+  @typedoc "Network option key"
+  @type network_key :: :network
+
+  @typedoc "Network option value"
+  @type network_value :: :mainnet | :testnet
+
+  @typedoc "Network options list"
+  @type network_opts :: [{network_key, network_value}]
 
   @doc """
-  Creates a wallet file
+  Creates a wallet file. You can use the short function to create an Aeternity wallet
+  without using pass_phrase, or use the full function and fill the parameters.
+
+  ## Options
+
+  The accepted options are:
+
+    * `:type` - specifies the type of wallet
+
+  The values for `:type` are:
+
+    * `:ae` - creates an Aeternity wallet
+    * `:btc` - creates a Bitcoin wallet
+
   ## Examples
-      iex> Wallet.create_wallet("pass")
+      iex> Wallet.create_wallet(password, path)
       Use the following phrase as additional authentication
       when accessing you wallet:
 
       whisper edit clump violin blame few ancient casual
       sand trip update spring
   """
-  @spec create_wallet(String.t(), String.t(), String.t()) :: String.t()
-  def create_wallet(password, pass_phrase \\ "", path \\ "") do
-    mnemonic_phrase = Mnemonic.generate_phrase(GenerateIndexes.generate_indexes)
+  @spec create_wallet(String.t(), String.t()) :: String.t()
+  def create_wallet(password, path) do
+    create_wallet(password, path, "", [])
+  end
+  @spec create_wallet(String.t(), String.t(), String.t(), wallet_opts()) :: String.t()
+  def create_wallet(password, path, pass_phrase \\ "", opts \\ []) do
+    mnemonic_phrase = Mnemonic.generate_phrase(Indexes.generate_indexes)
+    type = Keyword.get(opts, :type, :ae)
 
-    if pass_phrase != "" do
-      mnemonic_and_pass_phrase = mnemonic_phrase <> " " <> pass_phrase
-      save_wallet_file(mnemonic_and_pass_phrase, password, path)
-    else
-      save_wallet_file(mnemonic_phrase, password, path)
-    end
-
-    Logger.info("Your wallet was created.")
-    Logger.info("Use the following phrase as additional authentication when accessing your wallet:")
-    Logger.info(mnemonic_phrase)
+    {:ok, wallet_data} = build_wallet(mnemonic_phrase, pass_phrase, type)
+    {:ok, file_path} = save_wallet_file(wallet_data, password, path)
+    {:ok, mnemonic_phrase, file_path, type}
   end
 
   @doc """
   Creates a wallet file from an existing mnemonic_phrase and password
   If the wallet was not password protected, just pass the mnemonic_phrase
   """
-  @spec import_wallet(String.t(), String.t(), String.t(), String.t()) :: String.t()
-  def import_wallet(mnemonic_phrase, password, pass_phrase \\ "", path \\ "") do
-    if pass_phrase != "" do
-      mnemonic_phrase_with_pass_phrase = mnemonic_phrase <> " " <> pass_phrase
-      save_wallet_file(mnemonic_phrase_with_pass_phrase, password, path)
-    else
-      save_wallet_file(mnemonic_phrase, password, path)
-    end
-    Logger.info("You have successfully imported a wallet")
+  @spec import_wallet(String.t(), String.t(), String.t()) :: String.t()
+  def import_wallet(mnemonic_phrase, password, path) do
+    import_wallet(mnemonic_phrase, password, path, "", [])
+  end
+  @spec import_wallet(String.t(), String.t(), String.t(), String.t(), wallet_opts()) :: String.t()
+  def import_wallet(mnemonic_phrase, password, path, pass_phrase \\ "", opts \\ []) do
+    type = Keyword.get(opts, :type, :ae)
+
+    {:ok, wallet_data} = build_wallet(mnemonic_phrase, pass_phrase, type)
+    {:ok, file_path} = save_wallet_file(wallet_data, password, path)
+    {:ok, mnemonic_phrase, file_path, type}
   end
 
   @doc """
-  Decrypts a file and displays it's mnemonic phrase
-  Will only return a mnemonic phrase if the password is correct
+  Loads the wallet data
+    * Mnemonic phrase
+    * Wallet type
+    * Pass_phrase (if given when wallet was created)
+
+  ## Example
+      iex> Aewallet.Wallet.load_wallet_file(file_path, password)
+      {:ok,
+      "amazing feed doctor wing town furnace need hat public that derive athlete",
+      :ae}
   """
-  @spec load_wallet(String.t(), String.t(), String.t()) :: Tuple.t()
-  def load_wallet_file(file_path, password, pass_phrase \\ "") do
-    load_wallet(File.read(file_path), password, pass_phrase)
+  @spec load_wallet_file(String.t(), String.t()) :: tuple()
+  def load_wallet_file(file_path, password) do
+    load_wallet(File.read(file_path), password)
   end
-  def load_wallet({:ok, encrypted_data}, password, pass_phrase) do
-    mnemonic = Cypher.decrypt(encrypted_data, password)
-        if String.valid? mnemonic do
-          mnemonic_list = String.split(mnemonic)
-          pass_phrase_check = Enum.at(mnemonic_list, 12)
-          case pass_phrase_check do
-            :nil ->
-              {:ok , mnemonic}
-            result when result == pass_phrase ->
-              mnemonic = String.replace(mnemonic, " " <> pass_phrase, "")
-              {:ok, mnemonic}
-            _ ->
-              Logger.error("Invalid pass phrase")
-              {:error, "Invalid pass phrase"}
-          end
-        else
-          Logger.error("Invalid password")
-          {:error, "Invalid password"}
-        end
+
+  @doc """
+  Gets the public key
+  Will only return a public key if the password is correct
+  ## Examples
+      iex> Wallet.get_public_key(wallet_path, password)
+      {:ok, <<4, 210, 200, 166, 81, 219, 54, 116, 39, 64, 199, 57, 55, 152, 204, 119, 237,
+      168, 175, 243, 132, 39, 71, 208, 94, 138, 190, 242, 78, 74, 141, 43, 58, 241,
+      15, 19, 179, 45, 42, 79, 118, 24, 160, 20, 64, 178, 109, 124, 172, 127, ...>>, wallet_type}
+  """
+  @spec get_public_key(String.t(), String.t(), network_opts()) :: tuple()
+  def get_public_key(path, password, opts \\ []) do
+    network = Keyword.get(opts, :network, :mainnet)
+    case load_wallet_file(path, password) do
+      {:ok, mnemonic, wallet_type} ->
+        master_key =
+          mnemonic
+          |> KeyPair.generate_seed()
+          |> KeyPair.generate_master_key(network, [type: wallet_type])
+
+        public_key = KeyPair.to_public_key(master_key)
+        {:ok, public_key.key, wallet_type}
+
+      {:ok, mnemonic, wallet_type, pass_phrase} ->
+        master_key =
+          mnemonic
+          |> KeyPair.generate_seed(pass_phrase)
+          |> KeyPair.generate_master_key(network, type: wallet_type)
+
+        public_key = KeyPair.to_public_key(master_key)
+        {:ok, public_key.key, wallet_type}
+
+      {:error, message} ->
+        {:error, message}
+    end
   end
-  def load_wallet({:error, reason}, _password, _pass_phrase) do
+
+  @doc """
+  Gets the wallet address
+  Will only return an address if the password is correct
+
+  ## Options
+  The accepted options are:
+    * `:network` - specifies the network
+
+  The values for `:network` can be:
+    * `:mainnet` - (default)
+    * `:testnet`
+
+  ## Examples
+      iex> Wallet.get_address(file_path, password)
+      {:ok, "A1M51tw1MixFCe64g6ExhCEXnowEGrQ2DE"}
+
+      iex> Wallet.get_address(file_path, password, network: :mainnet)
+      {:ok, "A1M51tw1MixFCe64g6ExhCEXnowEGrQ2DE"}
+
+      iex> Wallet.get_address(file_path, password, network: :tesnet)
+      {:ok, "T6d3d2a14FiXGe17g8ExhCBAnfe4GrD2h5"}
+"""
+  @spec get_address(String.t(), String.t(), network_opts()) :: tuple()
+  def get_address(file_path, password, opts \\ []) do
+    network = Keyword.get(opts, :network, :mainnet)
+    case get_public_key(file_path, password) do
+      {:ok, pub_key, wallet_type} ->
+        address = KeyPair.generate_wallet_address(pub_key, network, wallet_type)
+        {:ok, address}
+
+      {:error, message} ->
+        {:error, message}
+    end
+  end
+
+  @doc """
+  Gets the private key
+  Will only return a private key if the password is correct
+  ## Examples
+      iex> Wallet.get_private_key(file_path, password)
+      {:ok, <<100, 208, 92, 132, 43, 104, 6, 55, 125, 18, 18, 215, 98, 8, 245, 12, 78, 92,
+      89, 115, 59, 231, 28, 142, 137, 119, 62, 19, 102, 238, 171, 185>>}
+  """
+  @spec get_private_key(String.t(), String.t(), network_opts()) :: tuple()
+  def get_private_key(file_path, password, opts \\ []) do
+    network = Keyword.get(opts, :network, :mainnet)
+    case load_wallet_file(file_path, password) do
+      {:ok, mnemonic, wallet_type} ->
+        private_key =
+          mnemonic
+          |> KeyPair.generate_seed()
+          |> KeyPair.generate_master_key(network, wallet_type)
+        {:ok, private_key.key}
+
+      {:ok, mnemonic, wallet_type, pass_phrase} ->
+        private_key =
+          mnemonic
+          |> KeyPair.generate_seed(pass_phrase)
+          |> KeyPair.generate_master_key(network, wallet_type)
+        {:ok, private_key.key}
+
+      {:error, message} ->
+        {:error, message}
+    end
+  end
+
+  ## Private functions
+
+  for {type, wallet_type} <- [ae: :ae, btc: :btc] do
+    defp build_wallet(mnemonic, pass_phrase, unquote(type)) do
+      {:ok, mnemonic
+            |> Kernel.<>(" ")
+            |> Kernel.<>(Atom.to_string(unquote(wallet_type)))
+            |> Kernel.<>(" ")
+            |> Kernel.<>(pass_phrase)}
+    end
+  end
+
+  @spec save_wallet_file(String.t(), String.t(), String.t()) :: tuple()
+  defp save_wallet_file(wallet_data, password, path) do
+    {{year, month, day}, {hours, minutes, seconds}} = :calendar.local_time()
+    file_name = "wallet--#{year}-#{month}-#{day}-#{hours}-#{minutes}-#{seconds}"
+    file_dir =
+      case path do
+        "" ->
+          default_dir = File.cwd! <> "/wallet"
+          File.mkdir(default_dir)
+          default_dir
+        _ ->
+          path
+      end
+
+    file_path = Path.join(file_dir, file_name)
+    case File.open(file_path, [:write]) do
+      {:ok, file} ->
+        encrypted = Cypher.encrypt(wallet_data, password)
+        IO.binwrite(file, encrypted)
+        File.close(file)
+        {:ok, file_path}
+
+      {:error, message} ->
+        throw("The path you have given has thrown an #{message} error!")
+    end
+  end
+
+  @spec load_wallet(tuple(), String.t()) :: tuple()
+  defp load_wallet({:ok, encrypted_data}, password) do
+    wallet_data = Cypher.decrypt(encrypted_data, password)
+    if String.valid? wallet_data do
+      data_list = String.split(wallet_data)
+      mnemonic =
+        data_list
+        |> Enum.slice(0..11)
+        |> Enum.join(" ")
+      wallet_type =
+        data_list
+        |> Enum.at(12)
+        |> String.to_atom()
+      case Enum.at(data_list, 13) do
+        :nil ->
+          {:ok, mnemonic, wallet_type}
+        pass_phrase ->
+          {:ok, mnemonic, wallet_type, pass_phrase}
+        _ ->
+          {:ok, mnemonic, wallet_type}
+      end
+    else
+      {:error, "Invalid password"}
+    end
+  end
+  defp load_wallet({:error, reason}, _password) do
     case reason do
       :enoent ->
         {:error, "The file does not exist."}
@@ -93,85 +277,6 @@ defmodule Aewallet.Wallet do
         {:error, "A component of the file name is not a directory."}
       :enomem ->
         {:error, "There is not enough memory for the contents of the file."}
-    end
-  end
-
-  @doc """
-  Gets the public key
-  Will only return a public key if the password is correct
-  ## Examples
-      iex> Wallet.get_public_key("wallet--2017-10-31-14-54-39", "password")
-      {:ok, <<4, 210, 200, 166, 81, 219, 54, 116, 39, 64, 199, 57, 55, 152, 204, 119, 237,
-      168, 175, 243, 132, 39, 71, 208, 94, 138, 190, 242, 78, 74, 141, 43, 58, 241,
-      15, 19, 179, 45, 42, 79, 118, 24, 160, 20, 64, 178, 109, 124, 172, 127, ...>>}
-  """
-  @spec get_public_key(String.t(), String.t(), String.t()) :: Tuple.t()
-  def get_public_key(file_path, password, pass_phrase \\ "") do
-    case load_wallet_file(file_path, password, pass_phrase) do
-      {:ok, mnemonic} ->
-        master_key =
-          mnemonic
-          |> KeyPair.generate_seed(pass_phrase)
-          |> KeyPair.generate_master_key(:btc)
-        public_key = KeyPair.to_public_key(master_key)
-        {:ok, public_key.key}
-      {:error, message} -> {:error, message}
-    end
-  end
-
-  @doc """
-  Gets the wallet address
-  Will only return an address if the password is correct
-  ## Examples
-      iex> Wallet.get_address("wallet--2017-10-31-14-54-39", "password")
-      {:ok, "1NM51tw1MixFCe64g6ExhCEXnowEGrQ2DE"}
-  """
-  @spec get_address(String.t(), String.t(), String.t()) :: Tuple.t()
-  def get_address(file_path, password, pass_phrase \\ "") do
-    case get_public_key(file_path, password, pass_phrase) do
-      {:ok, pub_key} ->
-        address = KeyPair.generate_wallet_address(pub_key, :btc)
-        {:ok, address}
-      {:error, message} -> {:error, message}
-    end
-  end
-
-  @doc """
-  Gets the private key
-  Will only return a private key if the password is correct
-  ## Examples
-      iex> Wallet.get_private_key("wallet--2017-10-31-14-54-39", "password")
-      {:ok, <<100, 208, 92, 132, 43, 104, 6, 55, 125, 18, 18, 215, 98, 8, 245, 12, 78, 92,
-      89, 115, 59, 231, 28, 142, 137, 119, 62, 19, 102, 238, 171, 185>>}
-  """
-  @spec get_private_key(String.t(), String.t(), String.t()) :: Tuple.t()
-  def get_private_key(file_path, password, pass_phrase \\ "") do
-    case load_wallet_file(file_path, password, pass_phrase) do
-      {:ok, mnemonic} ->
-        private_key =
-          mnemonic
-          |> KeyPair.generate_seed(pass_phrase)
-          |> KeyPair.generate_master_key(:btc)
-        {:ok, private_key.key}
-      {:error, message} -> {:error, message}
-    end
-  end
-
-  defp save_wallet_file(mnemonic_phrase, password, path) do
-    {{year, month, day}, {hours, minutes, seconds}} = :calendar.local_time()
-    file_name = "wallet--#{year}-#{month}-#{day}-#{hours}-#{minutes}-#{seconds}"
-    file_path =
-      path
-      |> Path.join(file_name)
-      |> File.open([:write])
-
-    case file_path do
-      {:ok, file} ->
-        encrypted = Cypher.encrypt(mnemonic_phrase, password)
-        IO.binwrite(file, encrypted)
-        File.close(file)
-      {:error, message} ->
-        throw("The path you have given has thrown an #{message} error!")
     end
   end
 end

@@ -1,4 +1,4 @@
-defmodule Aewallet.GenerateIndexes do
+defmodule Aewallet.Indexes do
   @moduledoc """
   Module for generating indexes used by the Mnemnonic module
   to generate a phrase from the wordlist
@@ -33,13 +33,13 @@ defmodule Aewallet.GenerateIndexes do
 
   alias Aewallet.Bits, as: Bits
 
-  ## 128 bits in bytes
+  # 128 bits in bytes
   @entropy_byte_size 16
 
   @doc """
   Generates random numbers(indexes) using entropy for guaranteed randomness
   ## Examples
-      iex> GenerateIndexes.generate_indexes()
+      iex> Indexes.generate_indexes()
       [674, 1135, 630, 1012, 624, 1428, 481, 1666, 693, 534, 1933, 628]
   """
   @spec generate_indexes :: List.t()
@@ -51,42 +51,11 @@ defmodule Aewallet.GenerateIndexes do
     |> Bits.to_binary_list()
     |> Enum.join()
     |> Kernel.<>(checksum)
-    |> split_bits_into_groups()
-    |> parse_binary_list()
+    |> Bits.split_into_groups()
+    |> Bits.parse_binary_list()
   end
 
-  @doc """
-  Splits the given string into groups of 11 bits each encoding
-  a number from 0-2047, serving as an index into a wordlist.
-  The result is a list of grups.
-  ## Examples
-      iex> GenerateIndexes.split_bits_into_groups("1011100011010100110110")
-      ["10100110110", "10111000110"]
-
-      iex> GenerateIndexes.split_bits_into_groups("1011100011010100110110" <> "1011001011")
-      ["10100110110", "10111000110"]
-  """
-  @spec split_bits_into_groups(String.t()) :: List.t()
-  def split_bits_into_groups(string_bits) do
-    split(string_bits)
-  end
-
-  @doc """
-  Converts binary list (consisting of groups of 11 bits)
-  to byte list (consisting of number from 0 to 2047)
-  ## Examples
-      iex> GenerateIndexes.parse_binary_list(["10100110110", "10111000110"])
-      [1478, 1334]
-  """
-  @spec parse_binary_list(List.t()) :: List.t()
-  def parse_binary_list(list) do
-    Enum.map(list, fn(binary) ->
-      binary_to_byte(binary)
-    end)
-  end
-  def binary_to_byte(binary), do: binary |> Integer.parse(2) |> elem(0)
-
-  ## Private functions
+  ## Private functions.
 
   defp generate_entropy(entropy_byte_size) do
     :crypto.strong_rand_bytes(entropy_byte_size)
@@ -96,20 +65,11 @@ defmodule Aewallet.GenerateIndexes do
     entropy_bit_size = entropy_byte_size * 8
     checksum_length = trunc(entropy_bit_size / 32)
 
-    ## Take the first 4 bits
+    # Take the first 4 bits of the entropy.
     :sha256
     |> :crypto.hash(entropy)
     |> Bits.to_binary_list()
     |> Enum.join()
     |> String.slice(0..(checksum_length - 1))
   end
-
-  defp split(string_bits) do
-    split(string_bits, [])
-  end
-  defp split(<<part::binary-11, rest::binary>>, acc) do
-    split(rest, [part | acc])
-  end
-  defp split("", acc), do: Enum.reverse(acc)
-
 end
