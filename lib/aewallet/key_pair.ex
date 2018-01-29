@@ -13,6 +13,9 @@ defmodule Aewallet.KeyPair do
   @typedoc "Wallet option value"
   @type value :: :ae | :btc
 
+  @typedoc "Type of network"
+  @type network :: :mainnet | :testnet
+
   @typedoc "Keyword options list"
   @type opts :: [{key, value}]
 
@@ -44,12 +47,6 @@ defmodule Aewallet.KeyPair do
 
   # Used as guard for the key derivation type: normal / hardned
   @mersenne_prime 2_147_483_647
-
-  # Prefixes for creating address on the Mainnet
-  @main_networks [ae: 0x18, btc: 0x00]
-
-  # Prefixes for creating address on Testnet
-  @test_networks [ae: 0x42, btc: 0x6F]
 
   @doc """
   Generates a seed from the given mnemonic and pass_phrase
@@ -87,23 +84,18 @@ defmodule Aewallet.KeyPair do
       master_extended_ae_key
 
   """
-  @spec generate_master_key(binary(), opts()) :: privkey()
+  @spec generate_master_key(binary(), network(), opts()) :: privkey()
   def generate_master_key(seed_bin, network \\ :mainnet, opts \\ []) do
     type = Keyword.get(opts, :type, :ae)
-    seed = case type do
-      :ae ->
-        :sha512
-        |> :crypto.hmac(@aeternity_key, seed_bin)
-
-      :btc ->
-        :sha512
-        |> :crypto.hmac(@bitcoin_key, seed_bin)
+    priv_and_chain = case type do
+      :ae -> :crypto.hmac(:sha512, @aeternity_key, seed_bin)
+      :btc -> :crypto.hmac(:sha512, @bitcoin_key, seed_bin)
+      _ -> throw("This wallet does not support #{type} wallet type")
     end
-    build_master_key(seed, network, type)
+    build_master_key(priv_and_chain, network, type)
   end
 
-  wallet_types = [ae: :ae, btc: :btc]
-  for {type, wallet_type} <- wallet_types do
+  for {type, wallet_type} <- [ae: :ae, btc: :btc] do
     defp build_master_key(<<priv_key::binary-32, c_code::binary>>, network, unquote(type)) do
       key = PrivKey.create(network, unquote(wallet_type))
       %{key | network: network, key: priv_key, chain_code: c_code}
@@ -169,6 +161,8 @@ defmodule Aewallet.KeyPair do
       <<0::size(8)>>, key.key::binary>>
     }
   end
+
+  @spec serialize(pubkey()) ::t()
   defp serialize(%PubKey{} = key) do
     {
       <<key.version::size(32)>>,
@@ -240,35 +234,42 @@ defmodule Aewallet.KeyPair do
   end
 
   @spec derive_key(privkey(), integer()) :: privkey()
-  def derive_key(%PrivKey{} = key, index) when index > -1 and index <= @mersenne_prime do
+  defp derive_key(%PrivKey{} = key, index) when index > -1 and index <= @mersenne_prime do
     # Normal derivation
-    compressed_pub_key =
-        generate_pub_key(key, :compressed)
+    compressed_pub_key = generate_pub_key(key, :compressed)
 
     <<derived_key::size(256), child_chain::binary>> =
-      :crypto.hmac(:sha512, key.chain_code,
-        <<compressed_pub_key::binary, index::size(32)>>)
+      :crypto.hmac(:sha512, key.chain_code, <<compressed_pub_key::binary, index::size(32)>>)
 
     <<parent_key_int::size(256)>> = key.key
-    child_key = :binary.encode_unsigned(rem(derived_key + parent_key_int, @n))
 
-    KeyPair.derive_key(key, child_key, child_chain, index)
+    child_key =
+      derived_key
+      |> Kernel.+(parent_key_int)
+      |> rem(@n)
+      |> :binary.encode_unsigned()
+
+    derive_key(key, child_key, child_chain, index)
   end
 
-  def derive_key(%PrivKey{} = key, index) when index > @mersenne_prime do
+  defp derive_key(%PrivKey{} = key, index) when index > @mersenne_prime do
     # Hardned derivation
     <<derived_key::size(256), child_chain::binary>> =
-      :crypto.hmac(:sha512, key.chain_code,
-        <<0::size(8), key.key::binary, index::size(32)>>)
+      :crypto.hmac(:sha512, key.chain_code, <<0::size(8), key.key::binary, index::size(32)>>)
 
     <<key_int::size(256)>> = key.key
-    child_key = :binary.encode_unsigned(rem(derived_key + key_int, @n))
 
-    KeyPair.derive_key(key, child_key, child_chain, index)
+    child_key =
+      derived_key
+      |> Kernel.+(key_int)
+      |> rem(@n)
+      |> :binary.encode_unsigned()
+
+    derive_key(key, child_key, child_chain, index)
   end
 
   @spec derive_key(pubkey(), integer()) :: pubkey()
-  def derive_key(%PubKey{} = key, index) when index > -1 and index <= @mersenne_prime do
+  defp derive_key(%PubKey{} = key, index) when index > -1 and index <= @mersenne_prime do
     # Normal derivation
     serialized_pub_key = compress(key.key)
 
@@ -279,16 +280,16 @@ defmodule Aewallet.KeyPair do
     # Elliptic curve point addition
     {:ok, child_key} = :libsecp256k1.ec_pubkey_tweak_add(key.key, derived_key)
 
-    KeyPair.derive_key(key, child_key, child_chain, index)
+    derive_key(key, child_key, child_chain, index)
   end
 
-  def derive_key(%PubKey{}, index) when index > @mersenne_prime do
+  defp derive_key(%PubKey{}, index) when index > @mersenne_prime do
     # Hardned derivation
     raise(RuntimeError, "Cannot derive Public Hardened child")
   end
 
   @spec derive_key(map(), integer(), binary(), integer()) :: map()
-  def derive_key(key, child_key, child_chain, index) when is_map(key) do
+  defp derive_key(key, child_key, child_chain, index) when is_map(key) do
     %{key |
       key: child_key,
       chain_code: child_chain,
@@ -308,13 +309,13 @@ defmodule Aewallet.KeyPair do
     * :mainnet = `0x18`
     * :testnet = `0x42`
   """
-  for {wallet_type, net_bytes} <- @main_networks do
+  for {wallet_type, net_bytes} <- [ae: 0x18, btc: 0x00] do
     def generate_wallet_address(public_key, :mainnet, unquote(wallet_type)) do
       generate_address(public_key, unquote(net_bytes))
     end
   end
 
-  for {wallet_type, net_bytes} <- @test_networks do
+  for {wallet_type, net_bytes} <- [ae: 0x42, btc: 0x6F] do
     def generate_wallet_address(public_key, :testnet, unquote(wallet_type)) do
       generate_address(public_key, unquote(net_bytes))
     end

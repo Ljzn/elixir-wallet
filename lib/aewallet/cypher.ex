@@ -26,6 +26,7 @@ defmodule Aewallet.Cypher do
       iex> Cypher.decrypt(encrypted_text, "password")
       "text to encrypt"
   """
+  @spec decrypt(binary(), String.t()) :: String.t()
   def decrypt(<<ivec::binary-16, encrypted_text::binary>>, password) do
     init = get_stream_state(password, ivec)
     {_state, decrypted_text} = :crypto.stream_decrypt(init, encrypted_text)

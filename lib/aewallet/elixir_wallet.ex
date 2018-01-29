@@ -27,8 +27,6 @@ defmodule Aewallet.Wallet do
   @typedoc "Network options list"
   @type network_opts :: [{network_key, network_value}]
 
-  @wallet_types  [ae: :ae, btc: :btc]
-
   @doc """
   Creates a wallet file. You can use the short function to create an Aeternity wallet
   without using pass_phrase, or use the full function and fill the parameters.
@@ -58,16 +56,12 @@ defmodule Aewallet.Wallet do
   end
   @spec create_wallet(String.t(), String.t(), String.t(), wallet_opts()) :: String.t()
   def create_wallet(password, path, pass_phrase \\ "", opts \\ []) do
-    mnemonic_phrase = generate_mnemonic()
+    mnemonic_phrase = Mnemonic.generate_phrase(Indexes.generate_indexes)
     type = Keyword.get(opts, :type, :ae)
+
     {:ok, wallet_data} = build_wallet(mnemonic_phrase, pass_phrase, type)
     {:ok, file_path} = save_wallet_file(wallet_data, password, path)
-
-    if pass_phrase == "" do
-      {:ok, mnemonic_phrase, file_path, type}
-    else
-      {:ok, mnemonic_phrase, file_path, type, pass_phrase}
-    end
+    {:ok, mnemonic_phrase, file_path, type}
   end
 
   @doc """
@@ -81,6 +75,7 @@ defmodule Aewallet.Wallet do
   @spec import_wallet(String.t(), String.t(), String.t(), String.t(), wallet_opts()) :: String.t()
   def import_wallet(mnemonic_phrase, password, path, pass_phrase \\ "", opts \\ []) do
     type = Keyword.get(opts, :type, :ae)
+
     {:ok, wallet_data} = build_wallet(mnemonic_phrase, pass_phrase, type)
     {:ok, file_path} = save_wallet_file(wallet_data, password, path)
     {:ok, mnemonic_phrase, file_path, type}
@@ -207,9 +202,7 @@ defmodule Aewallet.Wallet do
 
   ## Private functions
 
-  # The for func is used to pattern-match the wallet_type
-  # from the given type option.
-  for {type, wallet_type} <- @wallet_types do
+  for {type, wallet_type} <- [ae: :ae, btc: :btc] do
     defp build_wallet(mnemonic, pass_phrase, unquote(type)) do
       {:ok, mnemonic
             |> Kernel.<>(" ")
@@ -286,6 +279,4 @@ defmodule Aewallet.Wallet do
         {:error, "There is not enough memory for the contents of the file."}
     end
   end
-
-  defp generate_mnemonic, do: Mnemonic.generate_phrase(Indexes.generate_indexes)
 end
