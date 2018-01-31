@@ -7,9 +7,6 @@ defmodule Aewallet.KeyPair do
   alias Aewallet.Structs.Bip32PubKey, as: PubKey
   alias Aewallet.Structs.Bip32PrivKey, as: PrivKey
 
-  @typedoc "Wallet option key"
-  @type key :: :type
-
   @typedoc "Wallet option value"
   @type value :: :ae | :btc
 
@@ -24,6 +21,9 @@ defmodule Aewallet.KeyPair do
 
   @typedoc "Public extended key struct"
   @type pubkey :: %PubKey{}
+
+  @typedoc "Bip32 extended key"
+  @type key :: %PubKey{} | %PrivKey{}
 
   @typedoc "Public key type"
   @type pubkey_type :: :compressed
@@ -98,7 +98,7 @@ defmodule Aewallet.KeyPair do
   for {type, wallet_type} <- [ae: :ae, btc: :btc] do
     defp build_master_key(<<priv_key::binary-32, c_code::binary>>, network, unquote(type)) do
       key = PrivKey.create(network, unquote(wallet_type))
-      %{key | network: network, key: priv_key, chain_code: c_code}
+      %{key | key: priv_key, chain_code: c_code}
     end
   end
 
@@ -110,8 +110,9 @@ defmodule Aewallet.KeyPair do
   """
   @spec to_public_key(privkey()) :: pubkey()
   def to_public_key(%PrivKey{} = priv_key) do
-    pub_key = generate_pub_key(priv_key)
+    pub_key = KeyPair.generate_pub_key(priv_key.key)
     key = PubKey.create(priv_key.network, priv_key.currency)
+
     %{key |
       depth: priv_key.depth,
       f_print: priv_key.f_print,
@@ -120,30 +121,34 @@ defmodule Aewallet.KeyPair do
       key: pub_key}
   end
 
-  @spec generate_pub_key(privkey()) :: binary()
-  defp generate_pub_key(%PrivKey{key: priv_key}) do
+  @spec generate_pub_key(binary()) :: binary()
+  def generate_pub_key(priv_key) do
     {pub_key, _rest} = :crypto.generate_key(:ecdh, :secp256k1, priv_key)
     pub_key
   end
 
-  @spec generate_pub_key(privkey(), pubkey_type()) :: binary()
-  defp generate_pub_key(%PrivKey{} = key, :compressed) do
-    key
-    |> generate_pub_key()
+  @spec generate_pub_key(binary(), pubkey_type()) :: binary()
+  def generate_pub_key(priv_key, :compressed) do
+    priv_key
+    |> KeyPair.generate_pub_key()
     |> compress()
   end
 
   @spec fingerprint(privkey()) :: binary()
-  defp fingerprint(%PrivKey{} = key) do
-    key
-    |> generate_pub_key(:compressed)
+  defp fingerprint(%PrivKey{key: priv_key}) do
+    priv_key
+    |> KeyPair.generate_pub_key(:compressed)
     |> fingerprint()
   end
+
+  @spec fingerprint(pubkey()) :: binary()
   defp fingerprint(%PubKey{key: pub_key}) do
     pub_key
     |> compress()
     |> fingerprint()
   end
+
+  @spec fingerprint(binary()) :: binary()
   defp fingerprint(pub_key) do
     <<f_print::binary-4, _rest::binary>> =
       :crypto.hash(:ripemd160, :crypto.hash(:sha256, pub_key))
@@ -152,25 +157,25 @@ defmodule Aewallet.KeyPair do
 
   @spec serialize(privkey()) :: t()
   defp serialize(%PrivKey{} = key) do
-    {
-      <<key.version::size(32)>>,
-      <<key.depth::size(8),
-      key.f_print::binary-4,
-      key.child_num::size(32),
-      key.chain_code::binary,
-      <<0::size(8)>>, key.key::binary>>
-    }
+    serialized_key = <<0::size(8), key.key::binary>>
+    serialize(key, serialized_key)
   end
 
-  @spec serialize(pubkey()) ::t()
+  @spec serialize(pubkey()) :: t()
   defp serialize(%PubKey{} = key) do
+    serialized_key = compress(key.key)
+    serialize(key, serialized_key)
+  end
+
+  @spec serialize(key(), binary()) :: t()
+  defp serialize(key_data, serialized_key) do
     {
-      <<key.version::size(32)>>,
-      <<key.depth::size(8),
-      key.f_print::binary-4,
-      key.child_num::size(32),
-      key.chain_code::binary,
-      compress(key.key)::binary>>
+      <<key_data.version::size(32)>>,
+      <<key_data.depth::size(8),
+      key_data.f_print::binary-4,
+      key_data.child_num::size(32),
+      key_data.chain_code::binary,
+      serialized_key::binary>>
     }
   end
 
@@ -236,7 +241,7 @@ defmodule Aewallet.KeyPair do
   @spec derive_key(privkey(), integer()) :: privkey()
   defp derive_key(%PrivKey{} = key, index) when index > -1 and index <= @mersenne_prime do
     # Normal derivation
-    compressed_pub_key = generate_pub_key(key, :compressed)
+    compressed_pub_key = Aewallet.KeyPair.generate_pub_key(key.key, :compressed)
 
     <<derived_key::size(256), child_chain::binary>> =
       :crypto.hmac(:sha512, key.chain_code, <<compressed_pub_key::binary, index::size(32)>>)
