@@ -99,13 +99,29 @@ defmodule Aewallet.Wallet do
   end
 
   @doc """
-  Gets the public key
-  Will only return a public key if the password is correct
+  Gets the public key. Will only return a public key
+  if the password is correct. Set a desired network with the options
+  The default network is `:mainnet`.
+
+  ## Options
+  The accepted options are:
+    * `:network` - specifies the network
+
+  The values for `:network` can be:
+    * `:mainnet` - (default)
+    * `:testnet`
+
   ## Examples
       iex> Wallet.get_public_key(wallet_path, password)
       {:ok, <<4, 210, 200, 166, 81, 219, 54, 116, 39, 64, 199, 57, 55, 152, 204, 119, 237,
       168, 175, 243, 132, 39, 71, 208, 94, 138, 190, 242, 78, 74, 141, 43, 58, 241,
       15, 19, 179, 45, 42, 79, 118, 24, 160, 20, 64, 178, 109, 124, 172, 127, ...>>, wallet_type}
+
+      iex> Wallet.get_private_key(file_path, password, network: :mainnet)
+      {:ok, private_key_for_mainnet}
+
+      iex> Wallet.get_private_key(file_path, password, network: :testnet)
+      {:ok, private_key_for_testnet}
   """
   @spec get_public_key(String.t(), String.t(), network_opts()) :: tuple()
   def get_public_key(path, password, opts \\ []) do
@@ -135,9 +151,9 @@ defmodule Aewallet.Wallet do
   end
 
   @doc """
-  Gets the wallet address
-  Will only return an address if the password is correct
-
+  Gets the wallet address. Will only return an address if
+  the password is correct. Set a desired network with the options
+  The default network is `:mainnet`.
   ## Options
   The accepted options are:
     * `:network` - specifies the network
@@ -170,12 +186,28 @@ defmodule Aewallet.Wallet do
   end
 
   @doc """
-  Gets the private key
-  Will only return a private key if the password is correct
+  Gets the private key. Will only return a private key if
+  the password is correct. Set a desired network with the options
+  The default network is `:mainnet`.
+
+  ## Options
+  The accepted options are:
+    * `:network` - specifies the network
+
+  The values for `:network` can be:
+    * `:mainnet` - (default)
+    * `:testnet`
+
   ## Examples
       iex> Wallet.get_private_key(file_path, password)
       {:ok, <<100, 208, 92, 132, 43, 104, 6, 55, 125, 18, 18, 215, 98, 8, 245, 12, 78, 92,
       89, 115, 59, 231, 28, 142, 137, 119, 62, 19, 102, 238, 171, 185>>}
+
+      iex> Wallet.get_private_key(file_path, password, network: :mainnet)
+      {:ok, private_key_for_mainnet}
+
+      iex> Wallet.get_private_key(file_path, password, network: :testnet)
+      {:ok, private_key_for_testnet}
   """
   @spec get_private_key(String.t(), String.t(), network_opts()) :: tuple()
   def get_private_key(file_path, password, opts \\ []) do
@@ -185,14 +217,14 @@ defmodule Aewallet.Wallet do
         private_key =
           mnemonic
           |> KeyPair.generate_seed()
-          |> KeyPair.generate_master_key(network, wallet_type)
+          |> KeyPair.generate_master_key(network, type: wallet_type)
         {:ok, private_key.key}
 
       {:ok, mnemonic, wallet_type, pass_phrase} ->
         private_key =
           mnemonic
           |> KeyPair.generate_seed(pass_phrase)
-          |> KeyPair.generate_master_key(network, wallet_type)
+          |> KeyPair.generate_master_key(network, type: wallet_type)
         {:ok, private_key.key}
 
       {:error, message} ->
