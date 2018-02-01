@@ -201,7 +201,7 @@ defmodule Aewallet.Wallet do
 
     {:ok, _, wallet_type, _} = Wallet.load_wallet_file(file_path, password)
 
-    case Aewallet.Wallet.get_public_key(file_path, password) do
+    case Wallet.get_public_key(file_path, password) do
       {:ok, pub_key} ->
         address = KeyPair.generate_wallet_address(pub_key, network, wallet_type)
         {:ok, address}

@@ -241,7 +241,7 @@ defmodule Aewallet.KeyPair do
   @spec derive_key(privkey(), integer()) :: privkey()
   defp derive_key(%PrivKey{} = key, index) when index > -1 and index <= @mersenne_prime do
     # Normal derivation
-    compressed_pub_key = Aewallet.KeyPair.generate_pub_key(key.key, :compressed)
+    compressed_pub_key = KeyPair.generate_pub_key(key.key, :compressed)
 
     <<derived_key::size(256), child_chain::binary>> =
       :crypto.hmac(:sha512, key.chain_code, <<compressed_pub_key::binary, index::size(32)>>)
