@@ -7,7 +7,7 @@ defmodule Aewallet.Bits do
   @doc """
   Loops through the bitstring and converts it to binary list
   ## Examples
-      iex> Bits.to_binary_string(<<1>>)
+      iex> Bits.to_binary_list(<<1>>)
       [0, 0, 0, 0, 0, 0, 0, 1]
 
       iex> Bits.to_binary_list(<<45, 234>>)
